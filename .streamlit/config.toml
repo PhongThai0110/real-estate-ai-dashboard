@@ -1,0 +1,21 @@
+[server]
+headless = true
+gatherUsageStats = false
+port = 8501
+
+[theme]
+# Màu xanh dương chuyên nghiệp (Real Estate Trust Color)
+primaryColor = "#0068C9"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#31333F"
+font = "sans serif"
+
+[client]
+toolbarMode = "viewer"
+showErrorDetails = false
+
+[browser]
+# Tiêu đề mặc định trên Tab trình duyệt (trước khi app load xong)
+serverAddress = "localhost"
+gatherUsageStats = false

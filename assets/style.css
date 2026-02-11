@@ -1,0 +1,142 @@
+/* 1. IMPORT FONT: Sử dụng Inter - Font chuẩn quốc tế cho UI Dashboard */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+/* 2. THIẾT LẬP CHUNG */
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+
+/* 3. NỀN TRANG WEB (BACKGROUND) */
+/* Override nền mặc định của Streamlit */
+.stApp {
+    background-image: linear-gradient(to bottom right, #0f172a, #1e293b); /* Gradient Xám Xanh Đậm */
+    color: #f1f5f9; /* Màu chữ sáng */
+}
+
+/* 4. SIDEBAR (THANH BÊN) */
+[data-testid="stSidebar"] {
+    background-color: #0b1120; /* Màu tối hơn nền chính */
+    border-right: 1px solid rgba(255, 255, 255, 0.1); /* Đường viền mờ sang trọng */
+}
+
+/* 5. CÁC KHỐI KPI (METRIC CARDS) - QUAN TRỌNG NHẤT */
+/* Tạo hiệu ứng thẻ bài (Card UI) cho các số liệu */
+[data-testid="stMetric"] {
+    background-color: rgba(30, 41, 59, 0.7); /* Màu nền bán trong suốt */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 10px; /* Bo tròn */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* Đổ bóng */
+    transition: transform 0.2s; /* Hiệu ứng khi di chuột */
+}
+
+[data-testid="stMetric"]:hover {
+    transform: translateY(-5px); /* Nổi lên khi di chuột vào */
+    border-color: #38bdf8; /* Viền sáng lên màu xanh */
+}
+
+/* Chỉnh màu chữ label của Metric (VD: "Giá dự báo") */
+[data-testid="stMetricLabel"] {
+    color: #94a3b8 !important;
+    font-size: 0.9rem;
+}
+
+/* Chỉnh màu chữ giá trị của Metric (VD: "5 Tỷ") */
+[data-testid="stMetricValue"] {
+    color: #38bdf8 !important; /* Màu xanh neon nổi bật */
+    font-weight: 700;
+}
+
+/* 6. TIÊU ĐỀ (HEADERS) */
+h1, h2, h3 {
+    color: #ffffff !important;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+h1 {
+    background: -webkit-linear-gradient(45deg, #38bdf8, #818cf8); /* Hiệu ứng chữ Gradient */
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-bottom: 10px;
+}
+
+/* 7. NÚT BẤM (BUTTONS) */
+.stButton > button {
+    background: linear-gradient(90deg, #2563eb, #0ea5e9);
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 14px 0 rgba(0, 118, 255, 0.39);
+}
+
+.stButton > button:hover {
+    background: linear-gradient(90deg, #1d4ed8, #0284c7);
+    transform: scale(1.02);
+    box-shadow: 0 6px 20px rgba(0, 118, 255, 0.23);
+}
+
+/* 8. BẢNG DỮ LIỆU (DATAFRAME) */
+[data-testid="stDataFrame"] {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* 9. INPUT FIELDS (Ô NHẬP LIỆU) */
+.stTextInput > div > div > input, 
+.stSelectbox > div > div > div {
+    background-color: #1e293b;
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+}
+
+/* 10. LOẠI BỎ HEADER MẶC ĐỊNH CỦA STREAMLIT (NẾU CẦN) */
+header[data-testid="stHeader"] {
+    background-color: rgba(0,0,0,0); /* Trong suốt */
+}
+/* ==========================================================================
+   BỔ SUNG: TỐI ƯU HIỂN THỊ SIDEBAR
+   ========================================================================== */
+
+/* 1. Làm nổi bật các nhãn (Label) của ô nhập liệu (Input, Selectbox) trong Sidebar */
+[data-testid="stSidebar"] label[data-testid="stWidgetLabel"] p {
+    color: #e2e8f0 !important; /* Màu trắng xám rất sáng */
+    font-weight: 600 !important; /* Tăng độ đậm của chữ */
+    font-size: 0.95rem !important;
+}
+
+/* 2. Làm nổi bật chữ của các tùy chọn Radio Button (Ví dụ: "Hồ Chí Minh", "Hà Nội") */
+[data-testid="stSidebar"] div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {
+     color: #f1f5f9 !important; /* Màu trắng sáng */
+}
+
+/* 3. Làm nổi bật các đoạn văn bản thông thường trong Sidebar (Ví dụ: Thông tin sinh viên) */
+[data-testid="stSidebar"] .stMarkdown p {
+    color: #cbd5e1 !important; /* Màu xám sáng, dịu mắt hơn tiêu đề một chút */
+}
+
+/* 4. Tăng độ sáng cho các icon (nếu có) trong sidebar */
+[data-testid="stSidebar"] .st-emotion-cache-16idsys e1nzilvr5 {
+    color: #38bdf8 !important; /* Màu xanh neon điểm nhấn */
+}
+/* FILE: assets/style.css - Thêm vào cuối file */
+
+/* 1. Đổi màu mũi tên Dropdown sang trắng */
+[data-baseweb="select"] svg {
+    fill: #ffffff !important;
+}
+
+/* 2. (Phòng hờ) Đổi màu icon Xóa (khi đã chọn) sang trắng */
+[data-baseweb="select"] [aria-label="Clear value"] {
+    color: #ffffff !important;
+}
+
+/* 3. Tăng độ sáng cho viền ô nhập liệu để dễ nhận biết hơn */
+.stSelectbox > div > div {
+    border-color: rgba(255, 255, 255, 0.4) !important;
+}

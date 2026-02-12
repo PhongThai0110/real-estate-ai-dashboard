@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from src import loader # Import loader để lấy danh sách dự án
-from geopy.geocoders import Nominatim # <--- THÊM DÒNG NÀY
+from geopy.geocoders import MapBox # <--- THÊM DÒNG NÀY
 from time import sleep                # <--- THÊM DÒNG NÀY
 def show_sidebar():
     with st.sidebar:
@@ -58,22 +58,28 @@ def show_sidebar():
                 
                 if btn_find and address_input:
                     try:
-                        # 1. Đặt tên user_agent thật CỤ THỂ (tránh bị server chặn)
-                        # 2. Thêm timeout=10 để đợi lâu hơn nếu mạng chậm
-                        geolocator = Nominatim(user_agent="phong_real_estate_ai_app_v1_2026") 
+                        # --- SỬA ĐOẠN NÀY ---
+                        # Lấy token từ secrets
+                        mapbox_key = st.secrets["MAPBOX_TOKEN"] 
+                        
+                        # Khởi tạo MapBox Geocoder
+                        geolocator = MapBox(api_key=mapbox_key)
+                        
+                        # MapBox tìm rất nhanh, timeout thấp cũng được
                         location = geolocator.geocode(address_input, timeout=10)
                         
                         if location:
                             st.session_state.lat_val = location.latitude
                             st.session_state.lon_val = location.longitude
-                            st.success(f"✅ Đã chọn: {location.address[:40]}...")
+                            st.success(f"✅ Mapbox tìm thấy: {location.address}")
                             sleep(0.5)
                             st.rerun()
                         else:
-                            st.warning("⚠️ Không tìm thấy địa chỉ này. Hãy thử nhập tên Quận/Huyện thôi.")
-                            
-                    except Exception as e: # <--- SỬA DÒNG NÀY: Bắt lỗi cụ thể
-                        st.error(f"Lỗi chi tiết: {e}") # In ra lỗi thật sự
+                            st.warning("⚠️ Mapbox không tìm thấy địa chỉ này.")
+                        # --------------------
+                        
+                    except Exception as e:
+                        st.error(f"Lỗi: {e}. (Kiểm tra lại Token trong Secrets)")
 
             # --- TAB 2: DÀNH CHO NGƯỜI DÙNG KỸ TÍNH (HIỆN CÁI NÀY LÀ CHUẨN NHẤT) ---
             with tab_manual:

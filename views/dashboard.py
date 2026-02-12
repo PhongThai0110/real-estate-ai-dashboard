@@ -91,22 +91,39 @@ def format_price(val):
 
 def chart_heatmap_location(df):
     """
-    Bản đồ phân bố Bất động sản.
+    Bản đồ phân bố Bất động sản (Sử dụng Mapbox).
     """
-    # Dùng Smart Filter để loại bỏ điểm nhiễu
+    # 1. Lấy Token từ Secrets (BẢO MẬT)
+    mapbox_token = None
+    try:
+        # Cố gắng lấy token từ cấu hình của Streamlit
+        mapbox_token = st.secrets["MAPBOX_TOKEN"]
+    except (FileNotFoundError, KeyError):
+        # Nếu chưa cấu hình secrets thì báo lỗi và dừng lại
+        st.error("⚠️ Chưa cấu hình MAPBOX_TOKEN trong .streamlit/secrets.toml (local) hoặc Settings/Secrets (Cloud).")
+        return None
+
+    # 2. Cài đặt Token cho Plotly Express
+    # Dòng này bắt buộc phải có trước khi vẽ mapbox style "xịn"
+    px.set_mapbox_access_token(mapbox_token)
+
+    # ==================================================
+    # Xử lý dữ liệu (Giữ nguyên code cũ của bạn)
+    # ==================================================
     clean_df = filter_smart_coordinates(df)
     
     if clean_df is None or clean_df.empty:
         st.warning("⚠️ Không có dữ liệu toạ độ hợp lệ.")
         return None
 
-    # Xử lý tên hiển thị
     hover_name = 'district'
     if 'project_name_raw' in clean_df.columns:
         hover_name = 'project_name_raw'
     elif 'Tin_BĐS' not in clean_df.columns:
          clean_df['Tin_BĐS'] = "BĐS #" + clean_df.index.astype(str)
          hover_name = 'Tin_BĐS'
+    # ==================================================
+
 
     try:
         fig = px.scatter_mapbox(
@@ -119,28 +136,64 @@ def chart_heatmap_location(df):
             hover_data={"price": ":.2f", "area": ":.1f", "lat": False, "lon": False},
             size_max=15,
             zoom=10,
+            # Giữ nguyên dải màu của bạn, nó khá hợp với nền tối
             color_continuous_scale=[
-                (0.0, '#0f172a'), # Giá trị thấp nhất: Màu nền tối
-                (0.5, '#0ea5e9'), # Giá trị trung bình: Màu xanh dương sáng
-                (1.0, '#ffffff')  # Giá trị cao nhất: Màu trắng
+                (0.0, '#0f172a'), 
+                (0.5, '#0ea5e9'), 
+                (1.0, '#ffffff') 
             ],
   
-            mapbox_style="carto-darkmatter",
+            # --- [THAY ĐỔI QUAN TRỌNG Ở ĐÂY] ---
+            # Code cũ: mapbox_style="carto-darkmatter",
+            # Code mới: Sử dụng Mapbox Style URL chính chủ.
+            # Các lựa chọn style tối đẹp:
+            # 1. "mapbox://styles/mapbox/dark-v11" (Tối tiêu chuẩn, sạch sẽ)
+            # 2. "mapbox://styles/mapbox/navigation-night-v1" (Tối kiểu bản đồ dẫn đường xe hơi - Rất ngầu)
+            mapbox_style="mapbox://styles/mapbox/dark-v11", 
+            # -----------------------------------
+
             height=500,
             title=f"📍 Bản đồ phân bố ({len(clean_df)} tin)"
         )
-        fig.update_layout(**DARK_THEME_LAYOUT)
+        
+        # Áp dụng dark theme layout chung của bạn (nếu có biến này)
+        # Nếu chưa có biến này, hãy đảm bảo fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white')
+        if 'DARK_THEME_LAYOUT' in globals():
+             fig.update_layout(**DARK_THEME_LAYOUT)
+        else:
+             # Fallback nếu không tìm thấy biến global DARK_THEME_LAYOUT
+             fig.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='white'),
+                margin=dict(t=40, l=10, r=10, b=10)
+             )
+
         return fig
+
     except Exception as e:
-        st.error(f"Lỗi vẽ bản đồ: {e}")
+        # Bắt lỗi cụ thể nếu liên quan đến token
+        err_msg = str(e).lower()
+        if "mapbox access token" in err_msg or "401" in err_msg:
+             st.error("Lỗi xác thực Mapbox: Token không hợp lệ hoặc chưa được cài đặt đúng.")
+        else:
+             st.error(f"Lỗi vẽ bản đồ: {e}")
         return None
 
 
 def chart_top_expensive_projects(df):
     """
-    Top Khu vực/Dự án Đắt đỏ (Biểu đồ + Bản đồ).
+    Top Khu vực/Dự án Đắt đỏ (Biểu đồ + Bản đồ Mapbox).
     """
     if df is None or df.empty: return
+
+    # --- [BƯỚC 1: CÀI ĐẶT MAPBOX] ---
+    try:
+        mapbox_token = st.secrets["MAPBOX_TOKEN"]
+        px.set_mapbox_access_token(mapbox_token)
+    except:
+        st.warning("⚠️ Chưa có Mapbox Token. Bản đồ có thể không hiển thị đúng style.")
+    # --------------------------------
 
     group_col = None
     label_title = ""
@@ -177,6 +230,7 @@ def chart_top_expensive_projects(df):
 
     c1, c2 = st.columns([1, 1])
     
+    # --- CỘT TRÁI: BIỂU ĐỒ CỘT (Giữ nguyên) ---
     with c1:
         fig_bar = px.bar(
             top_10,
@@ -184,32 +238,44 @@ def chart_top_expensive_projects(df):
             y=group_col,
             orientation='h',
             color='price',
-            color_continuous_scale='Viridis',
+            color_continuous_scale='Viridis', # Hoặc đổi sang 'Teal' cho hợp tông xanh
             text_auto='.2s',
             labels={'price': 'Giá TB (Tỷ)', group_col: label_title},
             title="Xếp hạng theo giá"
         )
-        fig_bar.update_layout(**DARK_THEME_LAYOUT)
+        
+        # Áp dụng Dark Theme
+        if 'DARK_THEME_LAYOUT' in globals():
+             fig_bar.update_layout(**DARK_THEME_LAYOUT)
+        
         fig_bar.update_xaxes(showgrid=False)
         st.plotly_chart(fig_bar, width="stretch")
         
+    # --- CỘT PHẢI: BẢN ĐỒ MAPBOX (Đã nâng cấp) ---
     with c2:
         st.markdown(f"**🗺️ Vị trí thực tế:**")
+        
         fig_map = px.scatter_mapbox(
             top_10,
             lat="lat",
             lon="lon",
             color="price",
-            size="price",
+            size="price", # Bong bóng to nhỏ tùy theo giá
             hover_name=group_col,
             color_continuous_scale='Viridis',
-            zoom=9,
-            mapbox_style="carto-darkmatter",
+            zoom=10, # Zoom gần hơn chút để thấy rõ khu vực
+            
+            # --- [THAY ĐỔI STYLE TẠI ĐÂY] ---
+            mapbox_style="mapbox://styles/mapbox/navigation-night-v1",
+            # --------------------------------
+            
             height=400
         )
-        fig_map.update_layout(**DARK_THEME_LAYOUT)
         
-        # [FIX] Thêm scrollZoom=True vào đây
+        # Áp dụng Dark Theme
+        if 'DARK_THEME_LAYOUT' in globals():
+             fig_map.update_layout(**DARK_THEME_LAYOUT)
+        
         st.plotly_chart(fig_map, width="stretch", config={'scrollZoom': True})
 
 

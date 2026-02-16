@@ -9,3 +9,5 @@ scipy
 joblib
 category_encoders
 geopy
+shap
+matplotlib

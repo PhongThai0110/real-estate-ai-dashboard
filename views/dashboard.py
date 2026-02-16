@@ -43,42 +43,50 @@ DARK_THEME_LAYOUT = dict(
     
     margin=dict(t=40, l=10, r=10, b=10),
 )
-def filter_smart_coordinates(df):
+def filter_smart_coordinates(df, city_mode="All"):
     """
-    [NÂNG CẤP] Hàm lọc toạ độ thông minh.
-    1. Lọc toạ độ Việt Nam cơ bản.
-    2. Tự động phát hiện vùng miền (Bắc/Nam) dựa trên dữ liệu số đông.
-       - Nếu đa số là HCM -> Loại bỏ điểm nhiễu Hà Nội.
-       - Nếu đa số là Hà Nội -> Loại bỏ điểm nhiễu HCM.
+    [NÂNG CẤP V2] Lọc toạ độ dựa trên lựa chọn của người dùng (city_mode).
+    
+    Args:
+        df: DataFrame chứa cột 'lat', 'lon'.
+        city_mode: Giá trị lấy từ Sidebar ("Hồ Chí Minh", "Hà Nội", hoặc "All").
     """
     if df is None or df.empty: return df
     
-    # Copy để không ảnh hưởng data gốc
+    # 1. Copy data để không ảnh hưởng gốc
     df_clean = df.copy()
     
-    if 'lat' in df_clean.columns and 'lon' in df_clean.columns:
-        # 1. Loại bỏ NaN và toạ độ 0
-        df_clean = df_clean.dropna(subset=['lat', 'lon'])
-        df_clean = df_clean[(df_clean['lat'] != 0) & (df_clean['lon'] != 0)]
-        
-        # 2. Lọc cơ bản (Trong lãnh thổ VN)
-        df_clean = df_clean[(df_clean['lat'] > 8.0) & (df_clean['lat'] < 24.0)]
-        df_clean = df_clean[(df_clean['lon'] > 102.0) & (df_clean['lon'] < 110.0)]
-        
-        if df_clean.empty: return df_clean
+    # 2. Kiểm tra cột tồn tại
+    if 'lat' not in df_clean.columns or 'lon' not in df_clean.columns:
+        return df_clean
 
-        # 3. [MỚI] Lọc nhiễu Bắc/Nam (Dựa trên trung vị)
-        median_lat = df_clean['lat'].median()
+    # 3. Lọc Rác cơ bản (Bắt buộc phải làm)
+    # Loại bỏ NaN
+    df_clean = df_clean.dropna(subset=['lat', 'lon'])
+    # Loại bỏ toạ độ 0.0 (Phi Châu)
+    df_clean = df_clean[(df_clean['lat'] != 0) & (df_clean['lon'] != 0)]
+    # Loại bỏ toạ độ ngoài lãnh thổ VN (Sơ bộ)
+    df_clean = df_clean[(df_clean['lat'] > 8.0) & (df_clean['lat'] < 24.0)]
+    df_clean = df_clean[(df_clean['lon'] > 102.0) & (df_clean['lon'] < 110.0)]
+
+    if df_clean.empty: return df_clean
+
+    # 4. [LOGIC MỚI] Lọc theo City Mode
+    # Lấy vĩ độ 16.0 (Đà Nẵng/Đèo Hải Vân) làm ranh giới Bắc - Nam tự nhiên
+    
+    if city_mode == "Hồ Chí Minh":
+        # Chỉ lấy Miền Nam (Vĩ độ < 16)
+        df_clean = df_clean[df_clean['lat'] < 16.0]
         
-        if median_lat < 16.0: 
-            # Case: Đang xem dữ liệu Miền Nam (HCM, Đồng Nai...)
-            # Loại bỏ các điểm > 16 (tức là loại bỏ Hà Nội, Đà Nẵng...)
-            df_clean = df_clean[df_clean['lat'] < 16.0]
-        else:
-            # Case: Đang xem dữ liệu Miền Bắc (Hà Nội...)
-            # Loại bỏ các điểm < 16 (tức là loại bỏ HCM...)
-            df_clean = df_clean[df_clean['lat'] >= 16.0]
-            
+    elif city_mode == "Hà Nội":
+        # Chỉ lấy Miền Bắc (Vĩ độ >= 16)
+        df_clean = df_clean[df_clean['lat'] >= 16.0]
+        
+    else:
+        # Trường hợp "All" (Dành cho Chung cư/Đất nền hoặc khi chưa chọn khu vực)
+        # -> KHÔNG LỌC GÌ CẢ (Giữ lại cả Bắc và Nam để hiển thị hết)
+        pass 
+
     return df_clean
 
 def format_price(val):
@@ -89,7 +97,7 @@ def format_price(val):
 # 2. CÁC BIỂU ĐỒ CHÍNH (CHARTS)
 # ==============================================================================
 
-def chart_heatmap_location(df):
+def chart_heatmap_location(df,city_mode="All"):
     """
     Bản đồ phân bố Bất động sản (Sử dụng Mapbox).
     """
@@ -110,7 +118,7 @@ def chart_heatmap_location(df):
     # ==================================================
     # Xử lý dữ liệu (Giữ nguyên code cũ của bạn)
     # ==================================================
-    clean_df = filter_smart_coordinates(df)
+    clean_df = filter_smart_coordinates(df,city_mode=city_mode)
     
     if clean_df is None or clean_df.empty:
         st.warning("⚠️ Không có dữ liệu toạ độ hợp lệ.")
@@ -181,7 +189,7 @@ def chart_heatmap_location(df):
         return None
 
 
-def chart_top_expensive_projects(df):
+def chart_top_expensive_projects(df, city_mode="All"):
     """
     Top Khu vực/Dự án Đắt đỏ (Biểu đồ + Bản đồ Mapbox).
     """
@@ -200,8 +208,9 @@ def chart_top_expensive_projects(df):
     
     if 'project_name_raw' in df.columns:
         group_col = 'project_name_raw'; label_title = "Dự án"
-    elif 'district' in df.columns:
-        group_col = 'district'; label_title = "Quận/Huyện"
+    elif 'district_mapped' in df.columns:
+        group_col = 'district_mapped'; label_title = "Quận/Huyện"
+        df_clean = df.dropna(subset=[group_col]).copy()
     elif 'geo_cluster' in df.columns:
         group_col = 'geo_cluster'; label_title = "Khu vực"
     
@@ -210,7 +219,7 @@ def chart_top_expensive_projects(df):
         return
 
     # Lọc toạ độ trước khi tính toán
-    df_clean = filter_smart_coordinates(df)
+    df_clean = filter_smart_coordinates(df, city_mode=city_mode)
     
     stats = df_clean.groupby(group_col).agg({
         'price': 'mean',
@@ -396,7 +405,7 @@ def render_kpi_metrics(df):
 # 4. GIAO DIỆN CHÍNH (MAIN UI)
 # ==============================================================================
 
-def show_dashboard_ui(df, category_name):
+def show_dashboard_ui(df, category_name, city_mode="All"):
     """
     Hàm hiển thị chính được gọi từ app.py
     """
@@ -410,11 +419,11 @@ def show_dashboard_ui(df, category_name):
 
     # 2. BẢN ĐỒ LỚN (Có Scroll Zoom)
     # [FIX] Thêm config={'scrollZoom': True} để bật tính năng cuộn chuột
-    st.plotly_chart(chart_heatmap_location(df), width="stretch", config={'scrollZoom': True})
+    st.plotly_chart(chart_heatmap_location(df, city_mode=city_mode), width="stretch", config={'scrollZoom': True})
     st.markdown("---")
 
     # 3. TOP DỰ ÁN (Chia đôi màn hình)
-    chart_top_expensive_projects(df)
+    chart_top_expensive_projects(df, city_mode=city_mode)
     st.markdown("---")
 
     # 4. PHÂN TÍCH SÂU

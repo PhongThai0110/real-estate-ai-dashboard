@@ -8,7 +8,7 @@ from views import sidebar
 from views import dashboard  # File View (Vẽ biểu đồ)
 from src import loader       # File Model (Load dữ liệu/AI)
 from src import preprocessor # File Xử lý dữ liệu đầu vào
-
+from src import explainer     # File Giải thích AI (SHAP)
 # ==============================================================================
 # 1. CẤU HÌNH TRANG
 # ==============================================================================
@@ -106,7 +106,7 @@ def execute_prediction_flow(user_inputs, city_mode, property_type):
         # Chuyển về giá thực (Anti-Log)
         pred_real = np.expm1(pred_log) 
     
-        return max(0, pred_real)
+        return max(0, pred_real), model, processed_df  # Trả về giá trị dự báo, model và df đã xử lý (để debug nếu cần)
     except Exception as e:
         st.error(f"Lỗi khi model dự báo: {e}")
         return None
@@ -120,12 +120,15 @@ def format_currency(amount):
 # ==============================================================================
 def main():
     # 1. Hiển thị Sidebar & Lấy Input
-    nav_mode, user_inputs, dashboard_category, property_type, submit_btn = sidebar.show_sidebar()
-
+    # Lưu ý: Biến thứ 3 (third_param) trả về khác nhau tùy mode:
+    # - Mode Dashboard: Trả về Tên danh mục (VD: "Nhà phố Hồ Chí Minh")
+    # - Mode Dự báo: Trả về City Mode (VD: "Hồ Chí Minh")
+    nav_mode, user_inputs, third_param, property_type, submit_btn = sidebar.show_sidebar()
     # ==========================================================================
     # A. CHẾ ĐỘ DASHBOARD PHÂN TÍCH
     # ==========================================================================
     if nav_mode == "📊 Dashboard Phân tích":
+        dashboard_category = third_param  # Tên danh mục để hiển thị trên Dashboard
         st.title(f"📊 Phân tích: {dashboard_category}")
         
         # 1. LOAD DỮ LIỆU TỪ LOADER (Đã có KMeans và chuẩn hóa cột)
@@ -142,39 +145,48 @@ def main():
         
         selected_key = map_key.get(dashboard_category)
         df_selected = all_data.get(selected_key)
+        if "Hồ Chí Minh" in dashboard_category:
+            filter_city_mode = "Hồ Chí Minh"
+        elif "Hà Nội" in dashboard_category:
+            filter_city_mode = "Hà Nội"
+        else:
+            filter_city_mode = "All"
 
         # 3. HIỂN THỊ GIAO DIỆN (DELEGATE TO VIEW)
         # Thay vì viết code vẽ loằng ngoằng ở đây, ta gọi hàm chuyên dụng bên dashboard.py
         if df_selected is not None and not df_selected.empty:
-            dashboard.show_dashboard_ui(df_selected, dashboard_category)
+            # Truyền filter_city_mode vào hàm hiển thị
+            dashboard.show_dashboard_ui(
+                df_selected, 
+                dashboard_category, 
+                city_mode=filter_city_mode # <--- ĐÃ SỬA CHỖ NÀY
+            )
         else:
             st.warning(f"⚠️ Không tìm thấy dữ liệu cho **{dashboard_category}**.")
-            st.info("Gợi ý: Kiểm tra file CSV trong thư mục 'data/' hoặc logic trong 'src/loader.py'")
 
     # ==========================================================================
     # B. CHẾ ĐỘ DỰ BÁO GIÁ (AI PREDICTION)
     # ==========================================================================
     else:
+        # Ở chế độ này, third_param chính là city_mode
+        city_mode = third_param 
+        
         st.title("🤖 AI Định giá Bất động sản")
         
-        # Hiển thị ảnh Banner nếu chưa bấm nút
         if not submit_btn:
             st.info("👈 Vui lòng nhập thông tin BĐS bên thanh Sidebar để bắt đầu định giá.")
             if os.path.exists("assets/banner_intro.png"):
-                st.image("assets/banner_intro.png", width="stretch") # Banner dùng use_container_width ok
+                st.image("assets/banner_intro.png", width="stretch")
         else:
-            # Kiểm tra input cơ bản
             if user_inputs['area'] <= 0:
                 st.error("⚠️ Diện tích phải lớn hơn 0 m².")
             else:
-                # Gọi hàm dự báo
                 with st.spinner("AI đang phân tích và định giá..."):
-                    price = execute_prediction_flow(user_inputs, dashboard_category, property_type)
+                    # [SỬA LẠI] Nhận về 3 giá trị
+                    price, model, processed_data = execute_prediction_flow(user_inputs, city_mode, property_type)
                 
-                # Hiển thị kết quả
                 if price:
                     st.success("✅ Dự báo thành công!")
-                    
                     c1, c2 = st.columns(2)
                     with c1:
                         st.metric("Giá tham khảo", format_currency(price))
@@ -182,7 +194,36 @@ def main():
                         don_gia = (price * 1000) / user_inputs['area']
                         st.metric("Đơn giá ước tính", f"{don_gia:,.1f} Tr/m²")
                     
-                    st.caption("*Kết quả chỉ mang tính chất tham khảo dựa trên dữ liệu quá khứ.*")
+                    st.caption("*Kết quả chỉ mang tính chất tham khảo.*")
+                    
+                    # ==========================================================
+                    # [THÊM MỚI] PHẦN GIẢI THÍCH AI (WHITE BOX)
+                    # ==========================================================
+                    st.markdown("---")
+                    st.subheader("🤖 Tại sao AI đưa ra mức giá này?")
+                    
+                    with st.expander("xem chi tiết phân tích", expanded=True):
+                        if model and processed_data is not None:
+                            # Gọi hàm từ explainer.py
+                            df_expl, base_val = explainer.get_explanation(model, processed_data)
+                            
+                            if df_expl is not None:
+                                # 1. Vẽ biểu đồ
+                                fig = explainer.plot_waterfall(df_expl)
+                                st.plotly_chart(fig, use_container_width=True)
+                                
+                                # 2. Phân tích bằng lời (Tự động hóa)
+                                top_pos = df_expl[df_expl['Contribution'] > 0].head(1)
+                                top_neg = df_expl[df_expl['Contribution'] < 0].head(1)
+                                
+                                st.write("**Phân tích nhanh:**")
+                                if not top_pos.empty:
+                                    feat_name = top_pos.iloc[0]['Feature']
+                                    st.markdown(f"- 🟢 Yếu tố làm **TĂNG** giá mạnh nhất: **{feat_name}**")
+                                
+                                if not top_neg.empty:
+                                    feat_name = top_neg.iloc[0]['Feature']
+                                    st.markdown(f"- 🔴 Yếu tố làm **GIẢM** giá mạnh nhất: **{feat_name}**")
 
 if __name__ == "__main__":
     main()

@@ -68,11 +68,11 @@ def load_raw_data():
     # Mapping: Key -> (Tên file CSV, Tên file KMeans tương ứng)
     # Lưu ý: Tên file KMeans phải khớp với trong folder models của bạn
     config = {
-        'hcm':       {'csv': 'data_nha_hcm_final.csv',     'kmeans': 'kmeans_hcm.pkl'},
-        'hanoi':     {'csv': 'data_nha_hn_final.csv',      'kmeans': 'kmeans_hanoi.pkl'},
-        'apartment': {'csv': 'data_apartment_final.csv',   'kmeans': 'kmeans_apartment.pkl'},
-        'land':      {'csv': 'data_land_all_final.csv',    'kmeans': 'kmeans_land.pkl'},
-        'villa':     {'csv': 'data_villa_vip_final.csv',   'kmeans': 'kmeans_villa.pkl'}
+        'hcm':       {'csv': 'data_nha_hcm_train_ready.csv',     'kmeans': 'kmeans_hcm.pkl'},
+        'hanoi':     {'csv': 'data_nha_hn_train_ready.csv',      'kmeans': 'kmeans_hanoi.pkl'},
+        'apartment': {'csv': 'data_apartment_train_ready.csv',   'kmeans': 'kmeans_apartment.pkl'},
+        'land':      {'csv': 'data_land_all_train_ready.csv',    'kmeans': 'kmeans_land.pkl'},
+        'villa':     {'csv': 'data_villa_vip_train_ready.csv',   'kmeans': 'kmeans_villa.pkl'}
     }
     
     for key, cfg in config.items():

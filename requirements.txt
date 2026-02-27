@@ -11,3 +11,4 @@ category_encoders
 geopy
 shap
 matplotlib
+google-generativeai

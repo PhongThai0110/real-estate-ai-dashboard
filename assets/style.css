@@ -35,24 +35,64 @@ header[data-testid="stHeader"] {
     color: #e2e8f0 !important;
 }
 
-/* --- GROUP A: Ô NHẬP SỐ & Ô NHẬP CHỮ (NỀN TRẮNG - CHỮ ĐEN) --- */
-.stNumberInput div[data-baseweb="input"], 
-.stTextInput div[data-baseweb="input"] {
-    background-color: #ffffff !important;
-    border: 1px solid #dcdcdc !important;
-    border-radius: 6px;
-}
+/* --- GROUP A: Ô NHẬP SỐ & Ô NHẬP CHỮ (MẠNH TAY - ÉP ĐỒNG BỘ 100%) --- */
 
+/* 1. Ép nền tối cho CẢ khung viền lẫn lõi nhập chữ bên trong */
+.stNumberInput div[data-baseweb="input"], 
+.stTextInput div[data-baseweb="input"],
 .stNumberInput input, 
 .stTextInput input {
-    color: #000000 !important;       
-    caret-color: #000000 !important; 
-    font-weight: 600 !important;
+    background-color: #1e293b !important; /* Ép đồng màu với Dropdown */
+    color: #ffffff !important;            /* Ép chữ trắng */
+    -webkit-text-fill-color: #ffffff !important; /* Chống trình duyệt tự đổi màu chữ */
 }
 
-.stTextInput input::placeholder {
-    color: #a0a0a0 !important;
+/* 2. Sửa viền ngoài cùng đồng bộ */
+.stNumberInput div[data-baseweb="input"], 
+.stTextInput div[data-baseweb="input"] {
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 6px !important;
+    overflow: hidden !important; /* Chống lòi nền trắng ở các góc bo */
+}
+
+/* ==========================================================================
+  /* ==========================================================================
+   3. XỬ LÝ NÚT (+ / -) CỦA Ô NHẬP SỐ (ĐÚNG LOGIC NGƯỜI DÙNG)
+   ========================================================================== */
+
+/* Bước 1: ẨN TOÀN BỘ nút +/- ở Sidebar làm mặc định */
+section[data-testid="stSidebar"] div[data-testid="stNumberInput"] button {
+    display: none !important;
+}
+
+/* Bước 2: Ép text căn trái mượt mà cho các ô bị ẩn nút (VD: Diện tích) */
+section[data-testid="stSidebar"] div[data-testid="stNumberInput"] input {
+    text-align: left !important;
+    padding-left: 12px !important;
+}
+
+/* Bước 3: "BẮN TỈA" CHÍNH XÁC - Chỉ hiện lại nút +/- cho ô nào có step="1" (Số PN, Tầng, Toilet) */
+section[data-testid="stSidebar"] div[data-testid="stNumberInput"]:has(input[step="1"]) button {
+    display: flex !important; 
+    background-color: #1e293b !important; /* Màu nền nút tối, ăn nhập với viền */
+    border-radius: 4px !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.1) !important; /* Vạch ngăn cách mỏng */
+}
+
+/* Đổi màu icon cộng/trừ thành màu trắng sáng để dễ bấm */
+section[data-testid="stSidebar"] div[data-testid="stNumberInput"]:has(input[step="1"]) button svg {
+    fill: #ffffff !important; 
+}
+
+/* 4. Tùy chỉnh chữ gợi ý (Landmark 81...) và con trỏ */
+.stTextInput input::placeholder,
+.stNumberInput input::placeholder {
+    color: #94a3b8 !important;
     opacity: 1 !important;
+}
+.stTextInput input:focus, 
+.stNumberInput input:focus {
+    caret-color: #0ea5e9 !important; /* Con trỏ nhấp nháy màu xanh dương */
 }
 
 /* --- GROUP B: SELECTBOX (NỀN TỐI - CHỮ TRẮNG) --- */
@@ -92,6 +132,7 @@ ul[role="listbox"] li:hover {
 h1 {
     background: -webkit-linear-gradient(45deg, #38bdf8, #818cf8);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     padding-bottom: 10px;
     font-weight: 700;
@@ -176,4 +217,279 @@ div[data-testid="stExpander"] details div[data-testid="stMarkdownContainer"] p {
 div[data-testid="stExpander"] a {
     color: #38bdf8 !important;
     text-decoration: none;
+}
+/* ==========================================================================
+   6 & 7. GIAO DIỆN CHATBOT & THANH NHẬP LIỆU (MODERN GRADIENT STYLE)
+   ========================================================================== */
+
+/* --- A. THANH CÔNG CỤ DƯỚI CÙNG (ĐÃ SỬA LỖI "SƯƠNG MÙ") --- */
+div[data-testid="stBottom"] {
+    /* 1. Ép dải gradient cực mỏng: Chuyển từ trong suốt sang đen chỉ trong vòng 25px */
+    background: linear-gradient(to bottom, transparent 0%, rgba(15, 23, 42, 0.9) 25px, #0f172a 100%) !important;
+    
+    /* 2. Giảm độ mờ kính (blur) xuống mức nhẹ nhất để chỉ làm mờ nhẹ phần giáp ranh */
+    backdrop-filter: blur(3px) !important; 
+    -webkit-backdrop-filter: blur(3px) !important;
+    
+    /* 3. Bóp khoảng cách lề trên lại, trả lại không gian hiển thị cho tin nhắn */
+    padding-top: 5px !important; 
+    z-index: 1000 !important;
+}
+
+/* Các lớp con giữ trong suốt để không đè lên hiệu ứng */
+div[data-testid="stBottomBlockContainer"],
+div[data-testid="stBottom"] > div {
+    background-color: transparent !important;
+    border: none !important;
+}
+
+/* 4. BONUS: Đẩy phần đáy của toàn bộ khu vực chat lên một chút để chữ không bị kẹt dưới đáy */
+.stChatFloatingInputContainer {
+    padding-bottom: 20px !important; 
+}
+
+/* --- B. Ô NHẬP LIỆU (CHIẾN DỊCH "BÀN TAY SẮT" - LỘT SẠCH NỀN TRẮNG) --- */
+
+/* BƯỚC 1: XÓA SẠCH MỌI DẤU VẾT NỀN TRẮNG CỦA STREAMLIT */
+/* Lệnh này sẽ xuyên thủng TẤT CẢ các lớp div và textarea lồng nhau để đưa về trong suốt */
+div[data-testid="stChatInput"],
+div[data-testid="stChatInput"] div,
+div[data-testid="stChatInput"] textarea {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* BƯỚC 2: TÁI TẠO LẠI "VIÊN THUỐC" Ở ĐÚNG LỚP THỨ 3 (Lớp vỏ bao bọc) */
+/* Trong Streamlit, cấu trúc bọc luôn là: Wrapper > Sticky Container > Pill Box */
+div[data-testid="stChatInput"] > div > div {
+    background-color: rgba(30, 41, 59, 0.6) !important; /* Nền xám xanh tối bán trong suốt */
+    border: 1px solid rgba(255, 255, 255, 0.15) !important; /* Viền mờ tinh tế */
+    border-radius: 24px !important; /* Bo tròn hoàn hảo */
+    
+    /* Hiệu ứng kính mờ (Glassmorphism) */
+    backdrop-filter: blur(12px) !important; 
+    -webkit-backdrop-filter: blur(12px) !important;
+    
+    padding: 2px 15px !important; /* Ép khoảng trống bên trong cho gọn */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* BƯỚC 3: HIỆU ỨNG PHÁT SÁNG (GLOW) KHI CLICK VÀO */
+div[data-testid="stChatInput"] > div > div:focus-within {
+    border-color: #38bdf8 !important; /* Viền sáng xanh Neon */
+    background-color: rgba(30, 41, 59, 0.85) !important; /* Tối màu nền lại để làm nổi chữ */
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2) !important; /* Hào quang mờ xung quanh */
+}
+
+/* BƯỚC 4: ÉP MÀU CHỮ VÀ CON TRỎ BÊN TRONG LÕI */
+div[data-testid="stChatInput"] textarea {
+    color: #f8fafc !important; /* Chữ gõ màu trắng sáng */
+    -webkit-text-fill-color: #f8fafc !important; /* Khắc phục lỗi của trình duyệt Chrome/Safari */
+    caret-color: #38bdf8 !important; /* Con trỏ xanh Neon */
+    padding-top: 12px !important; /* Căn giữa chữ theo chiều dọc */
+}
+
+div[data-testid="stChatInput"] textarea::placeholder {
+    color: #64748b !important; /* Chữ gợi ý màu xám dịu */
+    -webkit-text-fill-color: #64748b !important;
+}
+
+/* BƯỚC 5: XỬ LÝ NÚT GỬI (MŨI TÊN) */
+div[data-testid="stChatInput"] button {
+    background-color: transparent !important;
+    color: #38bdf8 !important; /* Icon mũi tên màu xanh Neon */
+}
+
+div[data-testid="stChatInput"] button:hover {
+    background-color: #0ea5e9 !important; /* Đổi nền xanh khi rê chuột */
+    color: #ffffff !important; /* Mũi tên chuyển màu trắng */
+    border-radius: 50% !important;
+}
+
+/* --- C. TIN NHẮN CHAT (BẢN FIX CUỐI CÙNG - ÉP TRÁI/PHẢI TUYỆT ĐỐI) --- */
+
+/* 1. KHUNG CHUNG BONG BÓNG */
+div[data-testid="stChatMessage"] {
+    display: flex !important;
+    padding: 1.2rem 1.5rem !important;
+    margin-bottom: 1.5rem !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15) !important;
+    max-width: 85% !important; /* Giới hạn độ rộng để đọc chữ thoải mái */
+    width: fit-content !important;
+    clear: both !important;
+    
+    /* MẶC ĐỊNH LÀ BONG BÓNG AI (Nằm lề trái, Nền Slate đậm) */
+    background-color: rgba(30, 41, 59, 0.8) !important; 
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 4px 18px 18px 18px !important; /* Vuốt nhọn đuôi bên trái */
+    margin-right: auto !important; 
+    margin-left: 0 !important;
+    flex-direction: row !important;
+}
+
+/* Màu chữ mặc định (Của AI) */
+div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] p,
+div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] li {
+    color: #f8fafc !important; /* Trắng tinh khôi */
+    line-height: 1.6 !important;
+}
+
+/* ====================================================================== */
+/* 2. BONG BÓNG CỦA BẠN (TÌM DIỆT VÀ ĐẨY SANG LỀ PHẢI) */
+/* Quét 4 lớp: Bắt theo Label, theo ID, và đặc biệt bắt theo hình vẽ SVG (Icon người mặc định) */
+div[data-testid="stChatMessage"]:has([aria-label*="user"]),
+div[data-testid="stChatMessage"]:has([aria-label*="User"]),
+div[data-testid="stChatMessage"]:has([data-testid*="user"]),
+div[data-testid="stChatMessage"]:has(div[data-testid="stChatAvatar"] svg) {
+    background-color: rgba(14, 165, 233, 0.15) !important; /* Nền xanh dương */
+    border: 1px solid rgba(14, 165, 233, 0.3) !important;
+    border-radius: 18px 4px 18px 18px !important; /* Vuốt nhọn đuôi bên phải */
+    
+    /* ĐẢO NGƯỢC KHÔNG GIAN */
+    margin-left: auto !important; 
+    margin-right: 0 !important;
+    flex-direction: row-reverse !important; /* Ném Avatar sang bên phải chữ */
+}
+
+/* Sửa khoảng cách của Avatar User khi bị lật sang phải */
+div[data-testid="stChatMessage"]:has([aria-label*="user"]) div[data-testid="stChatAvatar"],
+div[data-testid="stChatMessage"]:has([aria-label*="User"]) div[data-testid="stChatAvatar"],
+div[data-testid="stChatMessage"]:has([data-testid*="user"]) div[data-testid="stChatAvatar"],
+div[data-testid="stChatMessage"]:has(div[data-testid="stChatAvatar"] svg) div[data-testid="stChatAvatar"] {
+    margin-left: 1rem !important;
+    margin-right: 0 !important;
+}
+
+/* Đổi màu và căn lề phải cho chữ của User */
+div[data-testid="stChatMessage"]:has([aria-label*="user"]) div[data-testid="stMarkdownContainer"] p,
+div[data-testid="stChatMessage"]:has([aria-label*="User"]) div[data-testid="stMarkdownContainer"] p,
+div[data-testid="stChatMessage"]:has([data-testid*="user"]) div[data-testid="stMarkdownContainer"] p,
+div[data-testid="stChatMessage"]:has(div[data-testid="stChatAvatar"] svg) div[data-testid="stMarkdownContainer"] p {
+    color: #e0f2fe !important; /* Trắng ám xanh lơ */
+    text-align: right !important; /* Căn phải cho thuận mắt */
+}
+/* ====================================================================== */
+
+/* 3. FIX LỖI TIÊU ĐỀ VÀ CHỮ IN ĐẬM BỊ MẤT MÀU */
+div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] h1,
+div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] h2,
+div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] h3,
+div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] strong,
+div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] b {
+    color: #38bdf8 !important; /* Trả lại màu Xanh Neon chói lóa */
+    font-weight: 700 !important;
+}
+
+/* 4. TÙY CHỈNH AVATAR TRÒN HOÀN HẢO */
+div[data-testid="stChatAvatar"] {
+    border-radius: 50% !important; 
+    border: 2px solid rgba(255, 255, 255, 0.15) !important; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+    overflow: hidden !important; /* Chống bị lòi nền trắng */
+}
+/* --- D. BẢNG BIỂU (TABLES) --- */
+div[data-testid="stChatMessage"] table {
+    color: #e2e8f0 !important;
+    background-color: transparent !important;
+    width: 100%;
+    border-collapse: collapse !important;
+}
+div[data-testid="stChatMessage"] th {
+    color: #38bdf8 !important;
+    border-bottom: 1px solid #475569 !important;
+    text-align: left !important;
+    padding: 8px !important;
+}
+div[data-testid="stChatMessage"] td {
+    color: #e2e8f0 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    padding: 8px !important;
+}
+/* ==========================================================================
+  /* ==========================================================================
+   8. MENU ĐIỀU HƯỚNG BÊN TRÁI (FLAT & ELEGANT STYLE)
+   ========================================================================== */
+
+/* 1. Ẩn hoàn toàn các chấm tròn (Radio button) mặc định */
+div[role="radiogroup"] label > div:first-of-type {
+    display: none !important;
+}
+
+/* 2. STYLE PHẲNG (FLAT): Hòa vào nền, không viền, không hộp */
+div[role="radiogroup"] label {
+    background-color: transparent !important;      /* Trong suốt hoàn toàn */
+    border: none !important;                       /* Xóa viền hộp thô cứng */
+    border-left: 4px solid transparent !important; /* Dành sẵn khoảng trống viền trái để chữ không bị giật khi click */
+    border-radius: 0px 8px 8px 0px !important;     /* Chỉ bo nhẹ góc bên phải */
+    padding: 12px 15px !important; 
+    margin-bottom: 2px !important;                 /* Gọn gàng hơn */
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;          /* Hiệu ứng mượt mà */
+}
+
+/* Màu chữ bình thường (Chưa chọn): Xám thanh lịch để nhường sự chú ý cho mục được chọn */
+div[role="radiogroup"] label:not(:has(input:checked)) p {
+    color: #94a3b8 !important; 
+    font-weight: 500 !important;
+}
+
+/* 3. HIỆU ỨNG HOVER (LƯỚT CHUỘT): Nổi nền mờ, rất tinh tế */
+div[role="radiogroup"] label:hover {
+    background-color: rgba(255, 255, 255, 0.04) !important; /* Mờ nhẹ, không gắt */
+}
+
+/* 4. TRẠNG THÁI ACTIVE (ĐANG CHỌN): ĐIỀM ĐẠM, UY TÍN */
+div[role="radiogroup"] label:has(input:checked) {
+    /* Gradient nền cực mờ, tạo chiều sâu chứ không chói */
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.12), transparent) !important; 
+    /* Vạch viền màu Xanh dương chuẩn (Trust Blue - #3b82f6), không dùng Neon nữa */
+    border-left: 4px solid #3b82f6 !important; 
+}
+
+/* 5. Chữ của mục đang chọn: Trắng sáng, nổi bật và sang trọng */
+div[role="radiogroup"] label:has(input:checked) p {
+    color: #ffffff !important;       
+    font-weight: 600 !important;     /* In đậm vừa phải, không bị cục mịch */
+}
+/* ==========================================================================
+   9. FIX LỖI TÀNG HÌNH TRONG EXPANDER (HƯỚNG DẪN TỌA ĐỘ)
+   ========================================================================== */
+
+/* Ép toàn bộ chữ (đoạn văn, danh sách, chữ in đậm) trong Expander sang màu Trắng/Xám sáng */
+div[data-testid="stExpander"] details div[data-testid="stMarkdownContainer"] p,
+div[data-testid="stExpander"] details div[data-testid="stMarkdownContainer"] li,
+div[data-testid="stExpander"] details div[data-testid="stMarkdownContainer"] span,
+div[data-testid="stExpander"] details div[data-testid="stMarkdownContainer"] strong {
+    color: #f1f5f9 !important; /* Màu trắng xám cực sáng */
+    line-height: 1.6 !important; /* Tăng khoảng cách dòng cho dễ đọc */
+    font-size: 0.95rem !important;
+}
+
+/* Fix riêng cho các thẻ link (a) bên trong Expander (VD: Link Google Maps) */
+div[data-testid="stExpander"] details div[data-testid="stMarkdownContainer"] a {
+    color: #38bdf8 !important; /* Xanh lơ sáng */
+    text-decoration: underline !important;
+    font-weight: 600 !important;
+}
+/* ==========================================================================
+   10. FIX LỖI TƯƠNG PHẢN THÔNG BÁO (ALERTS: SUCCESS, ERROR, WARNING)
+   ========================================================================== */
+
+/* Thêm viền mờ tinh tế cho hộp thông báo để nó nổi khối lên khỏi nền */
+div[data-testid="stAlert"] {
+    border-radius: 8px !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Ép toàn bộ chữ bên trong thông báo phát sáng cực mạnh để chống "tàng hình" */
+div[data-testid="stAlert"] p {
+    color: #f8fafc !important; /* Màu trắng sáng tinh khôi */
+    font-weight: 600 !important; /* In đậm để dễ đọc */
+    letter-spacing: 0.3px !important; /* Tăng khoảng cách chữ một xíu */
+}
+
+/* Ép luôn màu của các Icon (như dấu tick xanh, dấu X đỏ) sáng lên nếu có */
+div[data-testid="stAlert"] svg {
+    fill: #f8fafc !important;
 }

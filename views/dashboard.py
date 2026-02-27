@@ -15,9 +15,9 @@ DARK_THEME_LAYOUT = dict(
     font=dict(color='#ffffff'), # Ép toàn bộ font chữ cơ bản thành TRẮNG TINH
     
     # Cấu hình cụ thể cho Tiêu đề
-    title=dict(
-        font=dict(color='#38bdf8', size=18) # Màu xanh neon nổi bật cho tiêu đề biểu đồ
-    ),
+    #title=dict(
+     #   font=dict(color='#38bdf8', size=18) # Màu xanh neon nổi bật cho tiêu đề biểu đồ
+    #),
     
     # Cấu hình trục X (Trục ngang)
     xaxis=dict(
@@ -141,7 +141,16 @@ def chart_heatmap_location(df,city_mode="All"):
             color="price",
             size="area",
             hover_name=hover_name,
-            hover_data={"price": ":.2f", "area": ":.1f", "lat": False, "lon": False},
+            labels={
+                "price": "Giá (Tỷ)", 
+                "area": "Diện tích (m²)"
+            },
+            hover_data={
+                "price": ":.2f", # Giữ 2 số thập phân (VD: 9.99)
+                "area": ":.1f",  # Giữ 1 số thập phân (VD: 400.0)
+                "lat": False,    # Tắt hiển thị vĩ độ rườm rà
+                "lon": False     # Tắt hiển thị kinh độ rườm rà
+            },
             size_max=15,
             zoom=10,
             # Giữ nguyên dải màu của bạn, nó khá hợp với nền tối
@@ -161,7 +170,7 @@ def chart_heatmap_location(df,city_mode="All"):
             # -----------------------------------
 
             height=500,
-            title=f"📍 Bản đồ phân bố ({len(clean_df)} tin)"
+            #title=f":material/location_on: Bản đồ phân bố ({len(clean_df)} tin)"
         )
         
         # Áp dụng dark theme layout chung của bạn (nếu có biến này)
@@ -235,7 +244,7 @@ def chart_top_expensive_projects(df, city_mode="All"):
         st.info("Chưa đủ dữ liệu để xếp hạng Top 10.")
         return
 
-    st.subheader(f"💎 Top 10 {label_title} Đắt đỏ nhất")
+    st.subheader(f":material/diamond: Top 10 {label_title} Đắt đỏ nhất")
 
     c1, c2 = st.columns([1, 1])
     
@@ -262,7 +271,7 @@ def chart_top_expensive_projects(df, city_mode="All"):
         
     # --- CỘT PHẢI: BẢN ĐỒ MAPBOX (Đã nâng cấp) ---
     with c2:
-        st.markdown(f"**🗺️ Vị trí thực tế:**")
+        st.markdown(f"**:material/map: Vị trí thực tế:**")
         
         fig_map = px.scatter_mapbox(
             top_10,
@@ -271,13 +280,22 @@ def chart_top_expensive_projects(df, city_mode="All"):
             color="price",
             size="price", # Bong bóng to nhỏ tùy theo giá
             hover_name=group_col,
+            
+            # --- [CẬP NHẬT MỚI: VIỆT HÓA VÀ FORMAT TOOLTIP] ---
+            labels={
+                "price": "Giá trung bình (Tỷ)",
+                group_col: "Khu vực"
+            },
+            hover_data={
+                "price": ":.1f",  # Ép kiểu 1 số thập phân (VD: 30.4)
+                "lat": False,     # Tắt hiển thị Vĩ độ (lat)
+                "lon": False      # Tắt hiển thị Kinh độ (lon)
+            },
+            # ---------------------------------------------------
+            
             color_continuous_scale='Viridis',
-            zoom=10, # Zoom gần hơn chút để thấy rõ khu vực
-            
-            # --- [THAY ĐỔI STYLE TẠI ĐÂY] ---
+            zoom=10, 
             mapbox_style="mapbox://styles/mapbox/navigation-night-v1",
-            # --------------------------------
-            
             height=400
         )
         
@@ -303,7 +321,7 @@ def chart_donut_legal(df):
     fig = px.pie(
         legal_counts, values='Số lượng', names='Pháp lý', 
         hole=0.5, color='Pháp lý', color_discrete_map=color_map,
-        title=f"⚖️ Cơ cấu Pháp lý ({len(df)} tin)"
+        #title=f":material/balance: Cơ cấu Pháp lý ({len(df)} tin)"
     )
     fig.update_traces(textposition='inside', textinfo='percent+label')
     fig.update_layout(**DARK_THEME_LAYOUT)
@@ -312,52 +330,98 @@ def chart_donut_legal(df):
 
 
 def chart_scatter_area_price(df):
-    """Biểu đồ tương quan Diện tích - Giá"""
+    """Biểu đồ tương quan Diện tích - Giá (Đã tối ưu màu sắc High-Contrast)"""
     if df is None or df.empty: return None
     
-    df_zoom = df[(df['area'] > 0) & (df['price'] > 0)]
+    df_zoom = df[(df['area'] > 0) & (df['price'] > 0)].copy()
     if df_zoom['area'].max() > 1000:
         df_zoom = df_zoom[df_zoom['area'] < 1000]
         
+    # --- BẢNG MÀU THEO NGỮ NGHĨA (SEMANTIC COLORS) ---
+    semantic_colors = {
+        "Sổ hồng/Sổ đỏ": "#38bdf8",     # Xanh Cyan sáng (An toàn)
+        "Hợp đồng mua bán": "#fbbf24",  # Vàng Cam (Chờ đợi)
+        "Vi bằng/Giấy tay": "#f87171",   # Đỏ san hô (Rủi ro)
+        "Khác": "#c084fc",              # Tím sáng
+        "Giấy tờ khác": "#c084fc",      # (Tên dự phòng)
+        "Chưa xác định": "#94a3b8"      # Xám
+    }
+    
     fig = px.scatter(
         df_zoom, x='area', y='price',
         color='legal' if 'legal' in df.columns else None,
+        color_discrete_map=semantic_colors, # Ép dùng bảng màu tùy chỉnh
         trendline="ols",
-        labels={'area': 'Diện tích (m²)', 'price': 'Giá (Tỷ)'},
-        title="📈 Xu hướng Diện tích - Giá",
-        height=500, opacity=0.6
+        labels={'area': 'Diện tích (m²)', 'price': 'Giá (Tỷ)', 'legal': 'Pháp lý'},
+        height=500, 
+        opacity=0.8 # Tăng nhẹ độ đậm của chấm để rõ màu hơn
     )
-    fig.update_layout(**DARK_THEME_LAYOUT)
-    fig.update_xaxes(showgrid=True, gridcolor='rgba(255,255,255,0.1)') # Lưới mờ tinh tế
-    fig.update_yaxes(showgrid=True, gridcolor='rgba(255,255,255,0.1)')
+    
+    # Định dạng lại lưới và nền
+    if 'DARK_THEME_LAYOUT' in globals():
+        fig.update_layout(**DARK_THEME_LAYOUT)
+        
+    # Tinh chỉnh lưới mờ và di chuyển chú thích (Legend) cho thoáng
+    fig.update_xaxes(showgrid=True, gridcolor='rgba(255,255,255,0.05)') 
+    fig.update_yaxes(showgrid=True, gridcolor='rgba(255,255,255,0.05)')
+    fig.update_layout(legend=dict(
+        orientation="h", 
+        yanchor="bottom", 
+        y=1.02, 
+        xanchor="right", 
+        x=1
+    ))
+    
     return fig
 
 
 def chart_box_alley_impact(df):
-    """Biểu đồ hộp phân tích hẻm"""
+    """Biểu đồ phân phối giá theo loại đường (Đã chuyển sang Bar Chart cho dễ hiểu)"""
     if 'access_road' not in df.columns: return None
     
+    # 1. Lọc dữ liệu sạch
     work_df = df[(df['access_road'] > 0) & (df['area'] > 0)].copy()
     work_df['price_per_m2'] = (work_df['price'] * 1000) / work_df['area']
     work_df = work_df[work_df['price_per_m2'] < 500]
     
+    # 2. Phân loại đường
     def classify(w):
-        if w < 2.5: return "1. Hẻm nhỏ"
-        elif w < 5.0: return "2. Hẻm xe hơi"
-        elif w < 10: return "3. Đường ô tô tránh"
-        return "4. Mặt tiền"
+        if w < 2.5: return "1. Hẻm nhỏ (< 2.5m)"
+        elif w < 5.0: return "2. Hẻm xe hơi (2.5 - 5m)"
+        elif w < 10: return "3. Ô tô tránh (5 - 10m)"
+        return "4. Mặt tiền (> 10m)"
         
     work_df['Loai_duong'] = work_df['access_road'].apply(classify)
-    work_df = work_df.sort_values('Loai_duong')
     
-    fig = px.box(
-        work_df, x='Loai_duong', y='price_per_m2', color='Loai_duong',
-        title="📦 Phân phối giá theo loại đường",
-        labels={'price_per_m2': 'Triệu/m²', 'Loai_duong': ''},
-        points="outliers"
+    # 3. Tính toán mức giá phổ biến (Trung vị - Median) thay vì để Box Plot tự vẽ
+    stats_df = work_df.groupby('Loai_duong').agg(
+        Gia_Phobien=('price_per_m2', 'median')
+    ).reset_index()
+    
+    stats_df = stats_df.sort_values('Loai_duong')
+    
+    # 4. Vẽ biểu đồ CỘT (Dễ hiểu nhất với đại chúng)
+    fig = px.bar(
+        stats_df, 
+        x='Loai_duong', 
+        y='Gia_Phobien', 
+        color='Loai_duong',
+        text='Gia_Phobien', # Hiển thị số ngay trên cột
+        labels={
+            'Gia_Phobien': 'Đơn giá phổ biến (Triệu/m²)', 
+            'Loai_duong': '' 
+        }
     )
-    fig.update_layout(showlegend=False)
-    fig.update_layout(**DARK_THEME_LAYOUT)
+    
+    # Làm tròn số trên cột và đưa lên phía trên
+    fig.update_traces(texttemplate='%{text:.0f} Tr', textposition='outside')
+    
+    fig.update_layout(showlegend=False) # Tắt chú thích vì trục X đã rõ
+    fig.update_yaxes(range=[0, stats_df['Gia_Phobien'].max() * 1.2]) # Tăng khoảng không phía trên để số không bị cắt
+    
+    if 'DARK_THEME_LAYOUT' in globals():
+        fig.update_layout(**DARK_THEME_LAYOUT)
+        
     return fig
 
 
@@ -371,13 +435,24 @@ def chart_histogram_shape_ratio(df):
     
     fig = px.histogram(
         work_df, x='shape_ratio', nbins=40,
-        title="📐 Phân phối Hình dáng đất (Dài/Rộng)",
-        color_discrete_sequence=['#26A69A']
+        color_discrete_sequence=['#26A69A'],
+        labels={'shape_ratio': 'Tỷ lệ (Chiều Dài / Chiều Rộng)'}
     )
+    
+    # --- [CẬP NHẬT 1: Đổi tên trục dọc (Trục Y) dứt điểm] ---
+    fig.update_yaxes(title_text="Số lượng tin")
+    
+    # --- [CẬP NHẬT 2: Ép Tooltip (Hover) hiển thị tiếng Việt sạch sẽ] ---
+    # %{x} là giá trị trục ngang (Tỷ lệ), %{y} là giá trị trục dọc (Số lượng)
+    fig.update_traces(hovertemplate='Tỷ lệ (Dài/Rộng): %{x:.1f}<br>Số lượng tin: %{y}')
+    
     fig.add_vline(x=1, line_dash="dash", line_color="red", annotation_text="Vuông (1:1)")
     fig.add_vline(x=4, line_dash="dot", line_color="orange", annotation_text="Nhà ống (4:1)")
     fig.update_layout(bargap=0.1)
-    fig.update_layout(**DARK_THEME_LAYOUT)
+    
+    if 'DARK_THEME_LAYOUT' in globals():
+        fig.update_layout(**DARK_THEME_LAYOUT)
+        
     return fig
 
 # ==============================================================================
@@ -405,6 +480,10 @@ def render_kpi_metrics(df):
 # 4. GIAO DIỆN CHÍNH (MAIN UI)
 # ==============================================================================
 
+# ==============================================================================
+# 4. GIAO DIỆN CHÍNH (MAIN UI)
+# ==============================================================================
+
 def show_dashboard_ui(df, category_name, city_mode="All"):
     """
     Hàm hiển thị chính được gọi từ app.py
@@ -418,25 +497,34 @@ def show_dashboard_ui(df, category_name, city_mode="All"):
     st.markdown("---")
 
     # 2. BẢN ĐỒ LỚN (Có Scroll Zoom)
-    # [FIX] Thêm config={'scrollZoom': True} để bật tính năng cuộn chuột
+    # [FIX MỚI] Dùng Streamlit để vẽ Tiêu đề Icon
+    st.subheader(f":material/location_on: Bản đồ phân bố ({len(df)} tin)")
     st.plotly_chart(chart_heatmap_location(df, city_mode=city_mode), width="stretch", config={'scrollZoom': True})
     st.markdown("---")
 
-    # 3. TOP DỰ ÁN (Chia đôi màn hình)
+    # 3. TOP DỰ ÁN (Hàm này đã có sẵn st.subheader bên trong nên không cần thêm)
     chart_top_expensive_projects(df, city_mode=city_mode)
     st.markdown("---")
 
     # 4. PHÂN TÍCH SÂU
     c1, c2 = st.columns(2)
     with c1:
+        # [FIX MỚI] Tiêu đề biểu đồ Tròn
+        st.subheader(f":material/balance: Cơ cấu Pháp lý")
         st.plotly_chart(chart_donut_legal(df), width="stretch")
     with c2:
+        # [FIX MỚI] Tiêu đề biểu đồ Xu hướng
+        st.subheader(":material/trending_up: Xu hướng Diện tích - Giá")
         st.plotly_chart(chart_scatter_area_price(df), width="stretch")
 
     # 5. BIỂU ĐỒ ĐẶC THÙ
     if 'access_road' in df.columns:
         st.markdown("---")
+        # [FIX MỚI] Tiêu đề biểu đồ Boxplot
+        st.subheader(":material/add_road: Phân phối giá theo loại đường")
         st.plotly_chart(chart_box_alley_impact(df), width="stretch")
         
     if 'front_width' in df.columns:
+        # [FIX MỚI] Tiêu đề biểu đồ Histogram
+        st.subheader(":material/architecture: Phân phối Hình dáng đất (Dài/Rộng)")
         st.plotly_chart(chart_histogram_shape_ratio(df), width="stretch")

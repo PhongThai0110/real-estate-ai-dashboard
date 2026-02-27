@@ -10,6 +10,7 @@ FEATURE_MAP = {
     "front_width": "Mặt tiền ngang",
     "access_road": "Độ rộng đường/hẻm",
     "bedrooms": "Số phòng ngủ",
+    "bathrooms": "Số phòng tắm",
     "floors": "Số tầng",
     "toilet": "Số Toilet",
     "legal": "Pháp lý",
@@ -17,8 +18,30 @@ FEATURE_MAP = {
     "interior": "Nội thất",
     "project_name": "Dự án",
     "is_corner": "Lô góc (2 mặt tiền)",
-    "interior_score": "Điểm nội thất",
-    "legal_score": "Điểm pháp lý"
+    "interior_score": "Chất lượng nội thất",
+    "legal_score": "Điểm pháp lý",
+    "log_area": "Quy mô Diện tích (Log)", 
+    "land_depth": "Chiều sâu thửa đất (Giả định)",
+    "shape_ratio": "Tỷ lệ Hình dáng (Dài/Rộng)",
+    "business_potential": "Tiềm năng Kinh doanh (Mặt tiền x Đường)",
+    "log_dist": "Khoảng cách đến Trung tâm (Log)",
+    "geo_cluster": "Cụm Vị trí / Khu vực",
+    "interior_encoded": "Chất lượng nội thất",
+    "direction_Đông": "Hướng: Đông",
+    "direction_Tây": "Hướng: Tây",
+    "direction_Nam": "Hướng: Nam",
+    "direction_Đông Nam": "Hướng: Đông Nam",
+    "direction_Đông Bắc": "Hướng: Đông Bắc",
+    "direction_Tây Nam": "Hướng: Tây Nam",
+    "direction_Tây Bắc": "Hướng: Tây Bắc",
+    "direction_Chưa xác định": "Hướng: Chưa xác định",
+    # "direction_Bắc": "Hướng: Bắc", (Cột này bị drop nên thường sẽ không xuất hiện, nhưng cứ map thừa còn hơn thiếu)
+
+    # --- 5. ONE-HOT ENCODING: PHÁP LÝ (Legal) ---
+    # Quy tắc: legal + "_" + Loại giấy tờ
+    "legal_Sổ hồng/Sổ đỏ": "Pháp lý: Sổ hồng/Sổ đỏ",
+    "legal_Hợp đồng mua bán": "Pháp lý: HĐ Mua bán",
+    "legal_Vi bằng/Giấy tay": "Pháp lý: Vi bằng/Giấy tay",
 
 }
 
@@ -65,7 +88,7 @@ def get_explanation(model, X_input):
         # [LOGIC MỚI] VIỆT HÓA TÊN GỌI
         # ==========================================================
         def map_name(raw_name):
-            if raw_name == 'LOCATION_GROUP': return "📍 Vị trí & Khu vực"
+            if raw_name == 'LOCATION_GROUP': return " Vị trí & Khu vực"
             return FEATURE_MAP.get(raw_name, raw_name) # Nếu không có trong từ điển thì giữ nguyên
             
         df_expl['Feature'] = df_expl['Feature_Raw'].apply(map_name)
@@ -83,19 +106,26 @@ def get_explanation(model, X_input):
 
 def plot_waterfall(df_expl):
     """
-    Vẽ biểu đồ Waterfall với màu sắc trực quan.
+    Vẽ biểu đồ Waterfall với màu sắc trực quan (Đã chuyển Log thành %).
     """
-    # Lấy Top 7 yếu tố quan trọng nhất
-    top_features = df_expl.head(7).iloc[::-1]
+    # Lấy Top 7 yếu tố quan trọng nhất (Thêm .copy() để tránh cảnh báo của Pandas)
+    top_features = df_expl.head(7).iloc[::-1].copy()
+    
+    # =====================================================================
+    # [CẬP NHẬT MỚI: CHUYỂN ĐỔI LOG THÀNH PHẦN TRĂM (%) TÁC ĐỘNG THỰC TẾ]
+    # Công thức: (e^x - 1) * 100
+    # =====================================================================
+    top_features['Impact_Percent'] = (np.exp(top_features['Contribution']) - 1) * 100
     
     # Định dạng màu sắc: Xanh lá (Tăng giá) / Đỏ (Giảm giá)
-    colors = ['#00C853' if x > 0 else '#FF5252' for x in top_features['Contribution']]
+    colors = ['#00C853' if x > 0 else '#FF5252' for x in top_features['Impact_Percent']]
     
-    # Định dạng text hiển thị (Thêm dấu + nếu dương)
-    text_labels = [f"{x:+.2f} (Log)" for x in top_features['Contribution']]
+    # Định dạng text hiển thị (Thêm dấu + nếu dương, kèm ký hiệu %)
+    # Thay vì hiển thị (Log), ta hiển thị ví dụ: "+9.4%", "-14.7%"
+    text_labels = [f"{x:+.1f}%" for x in top_features['Impact_Percent']]
     
     fig = go.Figure(go.Bar(
-        x=top_features['Contribution'],
+        x=top_features['Impact_Percent'], # Đổi trục X sang sử dụng %
         y=top_features['Feature'],
         orientation='h',
         marker_color=colors,
@@ -105,27 +135,34 @@ def plot_waterfall(df_expl):
     ))
     
     fig.update_layout(
-        title={
-            'text': "🔍 Mức độ ảnh hưởng đến giá nhà",
-            'y':0.95,
-            'x':0.5,
-            'xanchor': 'center',
-            'yanchor': 'top',
-            'font': dict(size=18, color='#38bdf8')
-        },
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='white', size=13),
-        xaxis=dict(
-            title="Mức độ tác động (Sang phải là Tăng giá / Sang trái là Giảm giá)", 
-            showgrid=True, 
-            gridcolor='rgba(255,255,255,0.1)',
-            zeroline=True,
-            zerolinecolor='white'
-        ),
-        yaxis=dict(title=""),
-        margin=dict(l=10, r=10, t=100, b=10), 
-        height=450
-    )
-    
+            # ĐÃ XÓA KHỐI TITLE Ở ĐÂY
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white', size=13),
+            xaxis=dict(
+                title="Mức độ tác động (% Tăng/Giảm)", 
+                showgrid=True, 
+                gridcolor='rgba(255,255,255,0.1)',
+                zeroline=True,
+                zerolinecolor='white'
+            ),
+            yaxis=dict(title=""),
+            
+            # --- [CẬP NHẬT: Giảm lề trên (t=20) vì không còn Title của Plotly nữa] ---
+            margin=dict(l=10, r=10, t=20, b=65), 
+            height=480,
+            
+            annotations=[
+                dict(
+                    x=0.5,           
+                    y=-0.21,         
+                    xref='paper',
+                    yref='paper',
+                    text="<i>*Ghi chú: Mức độ tác động được so sánh với mặt bằng giá trung bình của toàn khu vực.</i>",
+                    showarrow=False,
+                    font=dict(size=12, color='#94a3b8') 
+                )
+            ]
+        )
     return fig
+        

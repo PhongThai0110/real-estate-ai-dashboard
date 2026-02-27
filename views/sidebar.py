@@ -17,25 +17,36 @@ def show_sidebar():
         # 1. LOGO
         if os.path.exists("assets/logo_fpt.png"):
             st.image("assets/logo_fpt.png", width=150)  
-        st.header("🏡 Real Estate AI")
+        st.header(":material/domain: Real Estate AI")
         
         # 2. MENU
-        nav_mode = st.radio("Chế độ:", ["🔍 Dự báo giá nhà", "📊 Dashboard Phân tích"])
+        nav_mode = st.radio("Chế độ:", [":material/search: Dự báo giá nhà", 
+                ":material/dashboard: Dashboard Phân tích",
+                ":material/chat: Chatbot Tư vấn"])
         st.markdown("---")
         
         # === A. CHẾ ĐỘ DASHBOARD ===
-        if nav_mode == "📊 Dashboard Phân tích":
+        if nav_mode == ":material/dashboard: Dashboard Phân tích":
             st.subheader("Tùy chọn hiển thị")
             dashboard_category = st.selectbox(
                 "Chọn dữ liệu:", 
                 ["Nhà phố Hồ Chí Minh", "Nhà phố Hà Nội", "Căn hộ Chung cư", "Đất nền", "Biệt thự / Villa"]
             )
-            st.info("👨‍💻 **Thái Nguyên Phong**\n\nSinh viên AI - Năm 2\nFPT University")
+          
             return nav_mode, {}, dashboard_category, "All", False
 
-        # === B. CHẾ ĐỘ DỰ BÁO ===
+        # === B. CHẾ ĐỘ CHATBOT  ===
+        elif nav_mode == ":material/chat: Chatbot Tư vấn":
+            # Khi chọn Chatbot, ta không cần hiển thị form nhập liệu phức tạp
+            # Chỉ cần hiển thị thông tin tác giả hoặc để trống cho sạch
+            st.info("🤖 **Trợ lý ảo Real Estate AI**\n\nSẵn sàng hỗ trợ bạn 24/7.")
+            
+            # Trả về các giá trị rỗng để app.py không bị lỗi
+            return nav_mode, {}, "All", "Chatbot", False
+
+        # === C. CHẾ ĐỘ DỰ BÁO ===
         else:
-            st.subheader("📝 Nhập thông tin BĐS")
+            st.subheader(":material/edit_document: Nhập thông tin BĐS")
             
             # 1. Chọn Loại hình & Khu vực trước
             property_type = st.selectbox("Loại hình BĐS", ["Nhà phố", "Căn hộ Chung cư", "Đất nền", "Biệt thự / Villa"])
@@ -47,11 +58,11 @@ def show_sidebar():
 
             # ------------------------------------------------------------------
             # PHẦN VỊ TRÍ (GIỮ NGUYÊN CODE CỦA BẠN)
-            st.markdown("#### 📍 Xác định vị trí")
+            st.markdown("#### :material/location_on: Xác định vị trí ")
             if 'lat_val' not in st.session_state: st.session_state.lat_val = 10.7769
             if 'lon_val' not in st.session_state: st.session_state.lon_val = 106.7009
 
-            tab_search, tab_manual = st.tabs(["🔍 Tìm theo Địa chỉ", "🛠️ Nhập Tọa độ (Thủ công)"])
+            tab_search, tab_manual = st.tabs([":material/search: Tìm theo Địa chỉ", ":material/my_location: Nhập Tọa độ (Thủ công)"])
 
             with tab_search:
                 col_s1, col_s2 = st.columns([3, 1])
@@ -86,12 +97,12 @@ def show_sidebar():
 
             with tab_manual:
                 st.info(
-                    "🎯 **Mẹo:** AI sẽ dự báo chuẩn hơn nếu bạn nhập Tọa độ chính xác từng mét "
+                    ":material/tips_and_updates: **Mẹo:** AI sẽ dự báo chuẩn hơn nếu bạn nhập Tọa độ chính xác từng mét "
                     "(thay vì chỉ tìm tên đường chung chung)."
                 )
 
                 # 2. Hướng dẫn lấy tọa độ (Thu gọn cho gọn giao diện)
-                with st.expander("ℹ️ Hướng dẫn lấy tọa độ từ Google Maps"):
+                with st.expander(":material/info: Hướng dẫn lấy tọa độ từ Google Maps"):
                     st.markdown("""
                         1. Truy cập [Google Maps](https://www.google.com/maps).
                         2. Tìm và zoom tới vị trí chính xác của BĐS.
@@ -251,7 +262,7 @@ def show_sidebar():
                 
                 # Cột 2: Lô góc (Chuyển xuống đây)
                 with c_corn:
-                    if property_type != "Căn hộ Chung cư":
+                    if property_type != "Căn hộ Chung cư" and property_type != "Đất nền":  # Chỉ nhà phố và biệt thự mới có lô góc
                         corner_opt = st.selectbox(
                             "Là Lô góc (2 mặt tiền)?", 
                             ["Không", "Có"],
@@ -263,10 +274,10 @@ def show_sidebar():
                         is_corner = 0 # Chung cư không có lô góc
                 
                 st.markdown("---")
-                st.markdown("**📍 Vị trí đã chọn:**")
+                st.markdown("**:material/pin_drop: Vị trí đã chọn:**")
                 st.info(f"Kinh độ (Lon): {st.session_state.lon_val:.5f} | Vĩ độ (Lat): {st.session_state.lat_val:.5f}")
 
-                submit_btn = st.form_submit_button("🚀 Dự báo ngay", type="primary")
+                submit_btn = st.form_submit_button(":material/online_prediction: Dự báo ngay", type="primary")
 
             # 3. Đóng gói dữ liệu
             user_inputs = {

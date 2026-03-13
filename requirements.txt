@@ -30,3 +30,4 @@ langchain-huggingface
 faiss-cpu
 sentence-transformers
 pypdf
+tabulate

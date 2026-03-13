@@ -11,7 +11,7 @@ def show_chat_interface():
     # 1. HEADER GIAO DIỆN
     # ==============================================================================
     st.markdown("## :material/smart_toy: Trợ lý ảo AI Bất động sản")
-    st.caption(":material/rocket_launch: Hỗ trợ giải đáp pháp lý, quy trình mua bán và kiến thức nhà đất (Powered by Gemini 1.5 Flash)")
+    st.caption(":material/rocket_launch: Hỗ trợ giải đáp pháp lý, quy trình mua bán và kiến thức nhà đất (Powered by Gemini 2.5 Flash)")
     
     # Nút xóa lịch sử chat (Để reset khi cần)
     if st.button(":material/delete_outline: Xóa lịch sử chat"):
@@ -61,8 +61,8 @@ def show_chat_interface():
             # Tạo hiệu ứng "Đang suy nghĩ..." để người dùng biết app đang chạy
             with st.spinner("AI đang phân tích câu hỏi..."):
                 
-                # Gọi hàm xử lý từ file chatbot_engine.py
-                ai_reply = chatbot_engine.get_gemini_response(
+                # Gọi TRẠM ĐỊNH TUYẾN từ file chatbot_engine.py để AI tự chọn luồng (PDF hoặc Excel)
+                ai_reply = chatbot_engine.chat_router(
                     prompt, 
                     st.session_state.messages[:-1] # Trừ câu vừa nhập ra để tránh trùng lặp
                 )

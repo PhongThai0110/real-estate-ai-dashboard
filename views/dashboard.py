@@ -386,10 +386,10 @@ def chart_box_alley_impact(df):
     
     # 2. Phân loại đường
     def classify(w):
-        if w < 2.5: return "1. Hẻm nhỏ (< 2.5m)"
-        elif w < 5.0: return "2. Hẻm xe hơi (2.5 - 5m)"
-        elif w < 10: return "3. Ô tô tránh (5 - 10m)"
-        return "4. Mặt tiền (> 10m)"
+        if w < 2.5: return "1. Hẻm xe máy (< 2.5m)"
+        elif w < 5.0: return "2. Hẻm 1 ô tô (2.5 - 5m)"
+        elif w < 10: return "3. Hẻm 2 ô tô (5 - 10m)"
+        return "4. Đường lớn (> 10m)"
         
     work_df['Loai_duong'] = work_df['access_road'].apply(classify)
     

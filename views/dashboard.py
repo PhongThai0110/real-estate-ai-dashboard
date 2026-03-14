@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.express as px
 import pandas as pd
 import numpy as np
-
+import altair as alt
 # ==============================================================================
 # 1. CÁC HÀM HỖ TRỢ (HELPER FUNCTIONS)
 # ==============================================================================
@@ -93,6 +93,15 @@ def format_price(val):
     if val >= 1: return f"{val:.2f} Tỷ"
     return f"{val*1000:.0f} Tr"
 
+
+def get_active_selections(chart_key):
+    """Hàm trích xuất dữ liệu selection từ st.session_state cho mọi loại biểu đồ"""
+    if chart_key in st.session_state:
+        selection = st.session_state[chart_key].get("selection", {})
+        points = selection.get("points", [])
+        if len(points) > 0:
+            return points # Trả về toàn bộ list các điểm được chọn
+    return None
 # ==============================================================================
 # 2. CÁC BIỂU ĐỒ CHÍNH (CHARTS)
 # ==============================================================================
@@ -132,7 +141,7 @@ def chart_heatmap_location(df,city_mode="All"):
          hover_name = 'Tin_BĐS'
     # ==================================================
 
-
+    clean_df['_row_id'] = clean_df.index.astype(str) # Đảm bảo ID là string để tránh lỗi khi truyền vào custom_data
     try:
         fig = px.scatter_mapbox(
             clean_df,
@@ -141,6 +150,7 @@ def chart_heatmap_location(df,city_mode="All"):
             color="price",
             size="area",
             hover_name=hover_name,
+            custom_data=['_row_id'], # Giữ lại ID gốc để truy xuất khi chọn điểm
             labels={
                 "price": "Giá (Tỷ)", 
                 "area": "Diện tích (m²)"
@@ -198,9 +208,10 @@ def chart_heatmap_location(df,city_mode="All"):
         return None
 
 
-def chart_top_expensive_projects(df, city_mode="All"):
+def chart_top_expensive_projects(df, city_mode="All",key_bar="top_bar"):
     """
     Top Khu vực/Dự án Đắt đỏ (Biểu đồ + Bản đồ Mapbox).
+    Đã thêm bộ lọc chống nhiễu (Chỉ xếp hạng những nơi có đủ số lượng tin)
     """
     if df is None or df.empty: return
 
@@ -230,25 +241,32 @@ def chart_top_expensive_projects(df, city_mode="All"):
     # Lọc toạ độ trước khi tính toán
     df_clean = filter_smart_coordinates(df, city_mode=city_mode)
     
+    # Gom nhóm và tính toán
     stats = df_clean.groupby(group_col).agg({
         'price': 'mean',
         'lat': 'mean',
         'lon': 'mean',
-        'area': 'count'
+        'area': 'count' # Mượn cột area để đếm số lượng tin đăng
     }).reset_index()
     
-    stats = stats[stats['area'] >= 2] 
+    # --- [SỬA LỖI LOGIC Ở ĐÂY] ---
+    # THIẾT LẬP NGƯỠNG TỐI THIỂU ĐỂ ĐƯỢC LÊN BẢNG XẾP HẠNG
+    # Đảm bảo dữ liệu đủ lớn để giá trị trung bình phản ánh đúng thực tế
+    MIN_LISTINGS = 15 
+    stats = stats[stats['area'] >= MIN_LISTINGS] 
+    # -----------------------------
+    
     top_10 = stats.sort_values(by='price', ascending=False).head(10)
     
     if top_10.empty:
-        st.info("Chưa đủ dữ liệu để xếp hạng Top 10.")
+        st.info(f"Chưa đủ dữ liệu để xếp hạng Top 10 (cần khu vực có trên {MIN_LISTINGS} tin đăng).")
         return
 
     st.subheader(f":material/diamond: Top 10 {label_title} Đắt đỏ nhất")
 
     c1, c2 = st.columns([1, 1])
     
-    # --- CỘT TRÁI: BIỂU ĐỒ CỘT (Giữ nguyên) ---
+    # --- CỘT TRÁI: BIỂU ĐỒ CỘT ---
     with c1:
         fig_bar = px.bar(
             top_10,
@@ -256,7 +274,7 @@ def chart_top_expensive_projects(df, city_mode="All"):
             y=group_col,
             orientation='h',
             color='price',
-            color_continuous_scale='Viridis', # Hoặc đổi sang 'Teal' cho hợp tông xanh
+            color_continuous_scale='Viridis', 
             text_auto='.2s',
             labels={'price': 'Giá TB (Tỷ)', group_col: label_title},
             title="Xếp hạng theo giá"
@@ -267,9 +285,9 @@ def chart_top_expensive_projects(df, city_mode="All"):
              fig_bar.update_layout(**DARK_THEME_LAYOUT)
         
         fig_bar.update_xaxes(showgrid=False)
-        st.plotly_chart(fig_bar, width="stretch")
+        st.plotly_chart(fig_bar, width="stretch", key=key_bar, on_select="rerun", selection_mode="points")
         
-    # --- CỘT PHẢI: BẢN ĐỒ MAPBOX (Đã nâng cấp) ---
+    # --- CỘT PHẢI: BẢN ĐỒ MAPBOX ---
     with c2:
         st.markdown(f"**:material/map: Vị trí thực tế:**")
         
@@ -281,17 +299,16 @@ def chart_top_expensive_projects(df, city_mode="All"):
             size="price", # Bong bóng to nhỏ tùy theo giá
             hover_name=group_col,
             
-            # --- [CẬP NHẬT MỚI: VIỆT HÓA VÀ FORMAT TOOLTIP] ---
+            # Việt hóa tooltip
             labels={
                 "price": "Giá trung bình (Tỷ)",
                 group_col: "Khu vực"
             },
             hover_data={
-                "price": ":.1f",  # Ép kiểu 1 số thập phân (VD: 30.4)
-                "lat": False,     # Tắt hiển thị Vĩ độ (lat)
-                "lon": False      # Tắt hiển thị Kinh độ (lon)
+                "price": ":.1f",  
+                "lat": False,     
+                "lon": False      
             },
-            # ---------------------------------------------------
             
             color_continuous_scale='Viridis',
             zoom=10, 
@@ -305,30 +322,73 @@ def chart_top_expensive_projects(df, city_mode="All"):
         
         st.plotly_chart(fig_map, width="stretch", config={'scrollZoom': True})
 
-
 def chart_donut_legal(df):
-    """Biểu đồ tròn tỷ lệ Pháp lý"""
+    """Biểu đồ tròn Altair: Legend nằm ngang bên phải (Side Legend)"""
     if 'legal' not in df.columns: return None
     
+    # 1. Thống kê và tính phần trăm
     legal_counts = df['legal'].fillna("Chưa xác định").value_counts().reset_index()
-    legal_counts.columns = ['Pháp lý', 'Số lượng']
+    legal_counts.columns = ['Pháp_lý', 'Số_lượng']
+    
+    total = legal_counts['Số_lượng'].sum()
+    legal_counts['Tỷ_lệ'] = (legal_counts['Số_lượng'] / total * 100).round(1)
+    
+    legal_counts['PhapLy_HienThi'] = legal_counts['Pháp_lý'] + " (" + legal_counts['Tỷ_lệ'].astype(str) + "%)"
     
     color_map = {
-        "Sổ hồng/Sổ đỏ": "#FF4B4B", "Hợp đồng mua bán": "#1E88E5",
-        "Vi bằng/Giấy tay": "#555555", "Giấy tờ khác": "#FFAA00", "Chưa xác định": "#E0E0E0"
+        "Sổ hồng/Sổ đỏ": "#38bdf8", 
+        "Hợp đồng mua bán": "#818cf8",
+        "Hợp đồng mua bán/Chờ sổ": "#c084fc", 
+        "Vi bằng/Giấy tay": "#f43f5e", 
+        "Giấy tờ khác": "#fbbf24", 
+        "Chưa xác định": "#94a3b8"
     }
+    domain = legal_counts['PhapLy_HienThi'].tolist()
+    range_ = [color_map.get(name, "#94a3b8") for name in legal_counts['Pháp_lý']]
     
-    fig = px.pie(
-        legal_counts, values='Số lượng', names='Pháp lý', 
-        hole=0.5, color='Pháp lý', color_discrete_map=color_map,
-        #title=f":material/balance: Cơ cấu Pháp lý ({len(df)} tin)"
+    click_selection = alt.selection_point(fields=['Pháp_lý'], name='legal_click')
+    
+    # 2. VẼ BIỂU ĐỒ 
+    donut = alt.Chart(legal_counts).mark_arc(
+        innerRadius=65,   # Bóp nhỏ xíu nữa để nhường không gian bề ngang cho Legend
+        outerRadius=115,  
+        stroke="#0f172a", strokeWidth=1.5
+    ).encode(
+        theta=alt.Theta(field="Số_lượng", type="quantitative"),
+        color=alt.Color(
+            field="PhapLy_HienThi",
+            type="nominal", 
+            scale=alt.Scale(domain=domain, range=range_),
+            legend=alt.Legend(
+                title=None, 
+                
+                # --- [CHÌA KHÓA Ở ĐÂY: CHUYỂN SANG BÊN PHẢI] ---
+                orient="right",    # Đưa toàn bộ khối chú thích sang bên phải cục bánh
+                
+                columns=1,         # Giữ nguyên xếp thành 1 hàng dọc
+                labelFontSize=13, 
+                labelColor="#cbd5e1", 
+                symbolType="circle",
+                labelLimit=0, 
+                offset=15,         # Cách cụm bánh 15px
+                rowPadding=8       # Tăng nhẹ khoảng cách các dòng cho thoáng mắt
+            )
+        ),
+        tooltip=[
+            alt.Tooltip('Pháp_lý', title='Pháp lý'),
+            alt.Tooltip('Số_lượng', title='Số lượng'),
+            alt.Tooltip('Tỷ_lệ', title='Tỷ lệ (%)')
+        ],
+        opacity=alt.condition(click_selection, alt.value(1.0), alt.value(0.3))
+    ).add_params(click_selection).properties(
+        
+        # Cân bằng lại Padding (xả bớt lề trên và dưới vì chữ đã dọn sang nhà bên phải)
+        padding={"left": 10, "top": 20, "right": 20, "bottom": 20} 
     )
-    fig.update_traces(textposition='inside', textinfo='percent+label')
-    fig.update_layout(**DARK_THEME_LAYOUT)
-    fig.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.1))
-    return fig
-
-
+    
+    chart = donut.configure_view(strokeWidth=0).configure(background='transparent')
+    
+    return chart
 def chart_scatter_area_price(df):
     """Biểu đồ tương quan Diện tích - Giá (Đã tối ưu màu sắc High-Contrast)"""
     if df is None or df.empty: return None
@@ -346,12 +406,13 @@ def chart_scatter_area_price(df):
         "Giấy tờ khác": "#c084fc",      # (Tên dự phòng)
         "Chưa xác định": "#94a3b8"      # Xám
     }
-    
+    df_zoom['_row_id'] = df_zoom.index.astype(str) # Đảm bảo ID là string để tránh lỗi khi truyền vào custom_data
     fig = px.scatter(
         df_zoom, x='area', y='price',
         color='legal' if 'legal' in df.columns else None,
         color_discrete_map=semantic_colors, # Ép dùng bảng màu tùy chỉnh
         trendline="ols",
+        custom_data=['_row_id'], # Giữ lại ID gốc để truy xuất khi chọn điểm
         labels={'area': 'Diện tích (m²)', 'price': 'Giá (Tỷ)', 'legal': 'Pháp lý'},
         height=500, 
         opacity=0.8 # Tăng nhẹ độ đậm của chấm để rõ màu hơn
@@ -425,30 +486,39 @@ def chart_box_alley_impact(df):
     return fig
 
 
-def chart_histogram_shape_ratio(df):
-    """Biểu đồ tỷ lệ hình dáng đất"""
+def chart_bar_shape_classification(df):
+    """Phân loại hình dáng đất thành các nhóm thân thiện với BĐS để lọc chéo"""
     if 'front_width' not in df.columns: return None
     
+    # 1. Lọc data hợp lệ và tính tỷ lệ (Dài/Rộng)
     work_df = df[(df['front_width'] > 0) & (df['area'] > 0)].copy()
     work_df['shape_ratio'] = (work_df['area'] / work_df['front_width']) / work_df['front_width']
-    work_df = work_df[work_df['shape_ratio'] <= 20]
     
-    fig = px.histogram(
-        work_df, x='shape_ratio', nbins=40,
-        color_discrete_sequence=['#26A69A'],
-        labels={'shape_ratio': 'Tỷ lệ (Chiều Dài / Chiều Rộng)'}
+    # 2. Phân loại theo thuật ngữ BĐS
+    def classify_shape(ratio):
+        if ratio < 1.0: return "1. Bề ngang rộng (Mặt tiền > Dài)"
+        elif ratio <= 2.5: return "2. Vuông vức (1:1 đến 1:2.5)"
+        elif ratio <= 5.0: return "3. Nhà ống (1:2.5 đến 1:5)"
+        else: return "4. Siêu hẹp & Dài (> 1:5)"
+        
+    work_df['Hinh_Dang'] = work_df['shape_ratio'].apply(classify_shape)
+    
+    # 3. Thống kê số lượng
+    stats_df = work_df['Hinh_Dang'].value_counts().reset_index()
+    stats_df.columns = ['Hinh_Dang', 'So_Luong']
+    stats_df = stats_df.sort_values('Hinh_Dang') # Sắp xếp theo thứ tự 1,2,3,4
+    
+    # 4. Vẽ biểu đồ Cột (Bar Chart)
+    fig = px.bar(
+        stats_df, x='Hinh_Dang', y='So_Luong', color='Hinh_Dang',
+        text='So_Luong',
+        labels={'Hinh_Dang': '', 'So_Luong': 'Số lượng tin'},
+        # Dùng bảng màu gradient từ xanh dương sang tím cho đẹp
+        color_discrete_sequence=['#38bdf8', '#818cf8', '#c084fc', '#f472b6'] 
     )
     
-    # --- [CẬP NHẬT 1: Đổi tên trục dọc (Trục Y) dứt điểm] ---
-    fig.update_yaxes(title_text="Số lượng tin")
-    
-    # --- [CẬP NHẬT 2: Ép Tooltip (Hover) hiển thị tiếng Việt sạch sẽ] ---
-    # %{x} là giá trị trục ngang (Tỷ lệ), %{y} là giá trị trục dọc (Số lượng)
-    fig.update_traces(hovertemplate='Tỷ lệ (Dài/Rộng): %{x:.1f}<br>Số lượng tin: %{y}')
-    
-    fig.add_vline(x=1, line_dash="dash", line_color="red", annotation_text="Vuông (1:1)")
-    fig.add_vline(x=4, line_dash="dot", line_color="orange", annotation_text="Nhà ống (4:1)")
-    fig.update_layout(bargap=0.1)
+    fig.update_traces(textposition='outside')
+    fig.update_layout(showlegend=False, yaxis_range=[0, stats_df['So_Luong'].max() * 1.2])
     
     if 'DARK_THEME_LAYOUT' in globals():
         fig.update_layout(**DARK_THEME_LAYOUT)
@@ -480,51 +550,179 @@ def render_kpi_metrics(df):
 # 4. GIAO DIỆN CHÍNH (MAIN UI)
 # ==============================================================================
 
-# ==============================================================================
-# 4. GIAO DIỆN CHÍNH (MAIN UI)
-# ==============================================================================
 
 def show_dashboard_ui(df, category_name, city_mode="All"):
-    """
-    Hàm hiển thị chính được gọi từ app.py
-    """
     if df is None or df.empty:
         st.warning(f"⚠️ Chưa có dữ liệu cho danh mục: **{category_name}**")
         return
 
-    # 1. KPI
-    render_kpi_metrics(df)
+    # =========================================================
+    # 🧠 BỘ NÃO V3: KÉT SẮT LƯU TRỮ BỘ LỌC CHỒNG
+    # =========================================================
+    if "global_filters" not in st.session_state:
+        st.session_state.global_filters = {}
+    # Bắt tín hiệu từ biểu đồ Pháp lý (Altair)
+    legal_altair_state = st.session_state.get("legal_donut", {}).get("selection", {})
+    if "legal_click" in legal_altair_state and len(legal_altair_state["legal_click"]) > 0:
+        # Lấy tên gốc (VD: "Sổ hồng/Sổ đỏ")
+        selected_legal = legal_altair_state["legal_click"][0]["Pháp_lý"] 
+        st.session_state.global_filters['Pháp lý'] = selected_legal
+    # Đọc tín hiệu từ các biểu đồ Plotly
+    alley_pts = get_active_selections("alley_bar")
+    if alley_pts and 'x' in alley_pts[0] and 'access_road' in df.columns:
+        st.session_state.global_filters['Loại đường'] = alley_pts[0]['x']
+
+    top_pts = get_active_selections("top_bar")
+    if top_pts and 'y' in top_pts[0]:
+        st.session_state.global_filters['Khu vực'] = top_pts[0]['y']
+
+    map_pts = get_active_selections("main_map")
+    if map_pts:
+        indices = [p['customdata'][0] for p in map_pts if 'customdata' in p]
+        if indices: st.session_state.global_filters['Khoanh vùng Bản đồ'] = indices
+
+    scatter_pts = get_active_selections("scatter_chart")
+    if scatter_pts:
+        indices = [p['customdata'][0] for p in scatter_pts if 'customdata' in p]
+        if indices: st.session_state.global_filters['Khoanh vùng Biểu đồ Giá'] = indices
+    
+    shape_pts = get_active_selections("shape_bar")
+    if shape_pts and 'x' in shape_pts[0] and 'front_width' in df.columns:
+        st.session_state.global_filters['Hình dáng'] = shape_pts[0]['x']
+
+
+    # =========================================================
+    # 🎯 THANH CÔNG CỤ XÓA BỘ LỌC TỪNG PHẦN
+    # =========================================================
+    filters = st.session_state.global_filters
+    widget_keys = {
+        'Pháp lý': 'legal_donut', 'Loại đường': 'alley_bar', 'Khu vực': 'top_bar',
+        'Khoanh vùng Bản đồ': 'main_map', 'Khoanh vùng Biểu đồ Giá': 'scatter_chart','Hình dáng': 'shape_bar'
+    }
+
+    if filters:
+        st.markdown("**:material/filter_alt: Đang lọc theo TẤT CẢ các điều kiện sau:**")
+        cols = st.columns(len(filters) + 1) 
+        
+        for i, (key, val) in enumerate(list(filters.items())):
+            display_val = f"{len(val)} căn" if isinstance(val, list) else str(val)
+            with cols[i]:
+                if st.button(f"{key}: {display_val[:15]}", key=f"clear_{key}", icon=":material/close:"):
+                    del st.session_state.global_filters[key]
+                    w_key = widget_keys.get(key)
+                    if w_key and w_key in st.session_state: del st.session_state[w_key]
+                    st.rerun()
+
+        with cols[-1]:
+            if st.button("XÓA TẤT CẢ", type="primary", icon=":material/delete_forever:"):
+                st.session_state.global_filters = {}
+                for w_key in widget_keys.values():
+                    if w_key in st.session_state: del st.session_state[w_key]
+                st.rerun()
+        st.markdown("---")
+
+    # =========================================================
+    # ⚙️ HÀM BỘ LỌC ĐỘNG (CHỐNG LỖI SẬP BIỂU ĐỒ TRÒN)
+    # =========================================================
+    # =========================================================
+    # ⚙️ HÀM BỘ LỌC ĐỘNG (CHỐNG LỖI SẬP BIỂU ĐỒ TRÒN)
+    # =========================================================
+    def apply_filters(data, current_filters, ignore_keys=[]):
+        """Hàm lọc Dataframe thông minh, cho phép bỏ qua một số key nhất định"""
+        d = data.copy()
+        for k, v in current_filters.items():
+            if k in ignore_keys: 
+                continue 
+                
+            if k == 'Pháp lý':
+                d = d[d['legal'] == v]
+            elif k == 'Loại đường':
+                if "Hẻm xe máy" in v: d = d[d['access_road'] < 2.5]
+                elif "Hẻm 1 ô" in v: d = d[(d['access_road'] >= 2.5) & (d['access_road'] < 5.0)]
+                elif "Hẻm 2 ô" in v: d = d[(d['access_road'] >= 5.0) & (d['access_road'] < 10.0)]
+                elif "Đường lớn" in v: d = d[d['access_road'] >= 10.0]
+                
+            # --- [SỬA Ở ĐÂY: LOGIC DÒ TÌM THÔNG MINH CHO KHU VỰC/DỰ ÁN] ---
+            elif k == 'Khu vực':
+                is_filtered = False
+                
+                # 1. Ưu tiên quét trong cột Tên Dự án trước (Dành cho Chung Cư)
+                for proj_col in ['project_name', 'project_name_raw', 'Tên Dự Án']: # Thay bằng tên cột thực tế của bạn nếu khác
+                    if proj_col in d.columns and v in d[proj_col].unique():
+                        d = d[d[proj_col] == v]
+                        is_filtered = True
+                        break
+                
+                # 2. Nếu không tìm thấy trong cột Dự án, quét sang cột Quận/Huyện (Dành cho Nhà Phố)
+                if not is_filtered:
+                    for dist_col in ['district_mapped', 'district', 'Quận']:
+                        if dist_col in d.columns:
+                            d = d[d[dist_col] == v]
+                            break
+            # -------------------------------------------------------------
+            
+            elif k in ['Khoanh vùng Bản đồ', 'Khoanh vùng Biểu đồ Giá']:
+                unique_indices_str = [str(x) for x in set(v)]
+                d = d[d.index.astype(str).isin(unique_indices_str)]
+            elif k == 'Hình dáng':
+                ratio = (d['area'] / d['front_width']) / d['front_width']
+                if "Bề ngang rộng" in v: d = d[ratio < 1.0]
+                elif "Vuông vức" in v: d = d[(ratio >= 1.0) & (ratio <= 2.5)]
+                elif "Nhà ống" in v: d = d[(ratio > 2.5) & (ratio <= 5.0)]
+                elif "Siêu hẹp" in v: d = d[ratio > 5.0]
+        return d
+
+    # Tạo 2 luồng Dataframe
+    df_filtered = apply_filters(df, filters) 
+    df_for_legal = apply_filters(df, filters, ignore_keys=['Pháp lý']) # Luồng riêng biệt chống sập bánh
+
+    if df_filtered.empty:
+        st.error("Không có căn nhà nào thỏa mãn ĐỒNG THỜI tất cả các điều kiện trên! Vui lòng xóa bớt bộ lọc.", icon=":material/search_off:")
+        return
+
+    # =========================================================
+    # 🎨 VẼ GIAO DIỆN
+    # =========================================================
+    render_kpi_metrics(df_filtered)
     st.markdown("---")
 
-    # 2. BẢN ĐỒ LỚN (Có Scroll Zoom)
-    # [FIX MỚI] Dùng Streamlit để vẽ Tiêu đề Icon
-    st.subheader(f":material/location_on: Bản đồ phân bố ({len(df)} tin)")
-    st.plotly_chart(chart_heatmap_location(df, city_mode=city_mode), width="stretch", config={'scrollZoom': True})
+    st.subheader(f":material/location_on: Bản đồ phân bố ({len(df_filtered)} tin)")
+    fig_map = chart_heatmap_location(df_filtered, city_mode=city_mode)
+    if fig_map: 
+        st.plotly_chart(fig_map, width="stretch", config={'scrollZoom': True}, key="main_map", on_select="rerun", selection_mode="points")
     st.markdown("---")
 
-    # 3. TOP DỰ ÁN (Hàm này đã có sẵn st.subheader bên trong nên không cần thêm)
-    chart_top_expensive_projects(df, city_mode=city_mode)
+    chart_top_expensive_projects(df_filtered, city_mode=city_mode, key_bar="top_bar")
     st.markdown("---")
 
     # 4. PHÂN TÍCH SÂU
     c1, c2 = st.columns(2)
     with c1:
-        # [FIX MỚI] Tiêu đề biểu đồ Tròn
         st.subheader(f":material/balance: Cơ cấu Pháp lý")
-        st.plotly_chart(chart_donut_legal(df), width="stretch")
-    with c2:
-        # [FIX MỚI] Tiêu đề biểu đồ Xu hướng
-        st.subheader(":material/trending_up: Xu hướng Diện tích - Giá")
-        st.plotly_chart(chart_scatter_area_price(df), width="stretch")
-
-    # 5. BIỂU ĐỒ ĐẶC THÙ
-    if 'access_road' in df.columns:
-        st.markdown("---")
-        # [FIX MỚI] Tiêu đề biểu đồ Boxplot
-        st.subheader(":material/add_road: Phân phối giá theo loại đường")
-        st.plotly_chart(chart_box_alley_impact(df), width="stretch")
         
-    if 'front_width' in df.columns:
-        # [FIX MỚI] Tiêu đề biểu đồ Histogram
-        st.subheader(":material/architecture: Phân phối Hình dáng đất (Dài/Rộng)")
-        st.plotly_chart(chart_histogram_shape_ratio(df), width="stretch")
+        # Dùng df_for_legal để biểu đồ không bị sập khi đang lọc
+        fig_donut = chart_donut_legal(df_for_legal)
+        if fig_donut: 
+            st.altair_chart(
+                fig_donut, 
+                width='stretch', 
+                key="legal_donut", 
+                on_select="rerun" # Kích hoạt tính năng Native Streamlit Cross-filtering
+            )
+
+    with c2:
+        st.subheader(":material/trending_up: Xu hướng Diện tích - Giá")
+        fig_scatter = chart_scatter_area_price(df_filtered)
+        if fig_scatter: st.plotly_chart(fig_scatter, width="stretch", key="scatter_chart", on_select="rerun", selection_mode="points")
+
+    if 'access_road' in df_filtered.columns:
+        st.markdown("---")
+        st.subheader(":material/add_road: Phân phối giá theo loại đường")
+        fig_box = chart_box_alley_impact(df_filtered)
+        if fig_box: st.plotly_chart(fig_box, width="stretch", key="alley_bar", on_select="rerun", selection_mode="points")
+        
+    if 'front_width' in df_filtered.columns:
+        st.subheader(":material/architecture: Phân loại Hình dáng đất")
+        fig_shape = chart_bar_shape_classification(df_filtered)
+        if fig_shape: 
+            st.plotly_chart(fig_shape, width="stretch", key="shape_bar", on_select="rerun", selection_mode="points")

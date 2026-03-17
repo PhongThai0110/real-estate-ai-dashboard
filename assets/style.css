@@ -140,20 +140,75 @@ h1 {
 
 h2, h3 { color: #ffffff !important; font-weight: 700; }
 
-.stButton > button {
-    background: linear-gradient(90deg, #2563eb, #0ea5e9);
-    color: white;
-    border: none;
-    padding: 10px 24px;
-    border-radius: 8px;
-    font-weight: 600;
+/* NÚT BẤM CHÍNH (Chỉ áp dụng màu Xanh cho các nút được chỉ định là Primary) */
+button[kind="primary"] {
+    background: linear-gradient(90deg, #2563eb, #0ea5e9) !important;
+    color: white !important;
+    border: none !important;
+    padding: 10px 24px !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
 }
 
-.stButton > button:hover {
-    background: linear-gradient(90deg, #1d4ed8, #0284c7);
-    transform: scale(1.02);
+button[kind="primary"]:hover {
+    background: linear-gradient(90deg, #1d4ed8, #0284c7) !important;
+    transform: scale(1.02) !important;
 }
 
+/* ========================================================= */
+/* 1. NÚT GỢI Ý (TERTIARY) -> HÀO QUANG XANH LƠ               */
+/* ========================================================= */
+button[kind="tertiary"] {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: #cccccc !important;
+    border-radius: 24px !important; /* Bo góc viên thuốc */
+    padding: 10px 16px !important;
+    box-shadow: none !important;
+    transition: all 0.3s ease !important;
+}
+
+button[kind="tertiary"]:hover {
+    background: rgba(56, 189, 248, 0.1) !important; 
+    border-color: #38bdf8 !important; 
+    color: #e0f2fe !important; 
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.35) !important; /* Sáng Xanh Lơ */
+    transform: translateY(-2px) !important;
+}
+
+button[kind="tertiary"] p {
+    font-size: 14px !important;
+    font-weight: 400 !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    margin: 0 !important;
+}
+
+/* ========================================================= */
+/* 2. NÚT XÓA / HỦY BỎ (SECONDARY) -> BÁO ĐỘNG ĐỎ            */
+/* ========================================================= */
+button[kind="secondary"] {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: #cccccc !important;
+    border-radius: 8px !important; /* Form vuông vắn chuẩn Dashboard */
+    padding: 10px 16px !important;
+    transition: all 0.3s ease !important;
+}
+
+button[kind="secondary"]:hover {
+    background: rgba(255, 75, 75, 0.05) !important; 
+    border-color: rgba(255, 75, 75, 0.5) !important; 
+    box-shadow: 0 0 10px rgba(255, 75, 75, 0.2) !important; /* Ánh Đỏ */
+    transform: translateY(-2px) !important;
+}
+
+/* Ép tất cả chữ và icon bên trong nút Xóa thành màu đỏ khi rê chuột */
+button[kind="secondary"]:hover p,
+button[kind="secondary"]:hover span,
+button[kind="secondary"]:hover div {
+    color: #ff4b4b !important; 
+}
 [data-testid="stMetric"] {
     background-color: rgba(30, 41, 59, 0.7);
     border: 1px solid rgba(255, 255, 255, 0.1);

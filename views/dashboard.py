@@ -607,23 +607,20 @@ def show_dashboard_ui(df, category_name, city_mode="All"):
         for i, (key, val) in enumerate(list(filters.items())):
             display_val = f"{len(val)} căn" if isinstance(val, list) else str(val)
             with cols[i]:
-                if st.button(f"{key}: {display_val[:15]}", key=f"clear_{key}", icon=":material/close:"):
+                if st.button(f"{key}: {display_val[:15]}", key=f"clear_{key}",type="tertiary", icon=":material/close:"):
                     del st.session_state.global_filters[key]
                     w_key = widget_keys.get(key)
                     if w_key and w_key in st.session_state: del st.session_state[w_key]
                     st.rerun()
 
         with cols[-1]:
-            if st.button("XÓA TẤT CẢ", type="primary", icon=":material/delete_forever:"):
+            if st.button("XÓA TẤT CẢ", type="secondary", icon=":material/delete_forever:"):
                 st.session_state.global_filters = {}
                 for w_key in widget_keys.values():
                     if w_key in st.session_state: del st.session_state[w_key]
                 st.rerun()
         st.markdown("---")
 
-    # =========================================================
-    # ⚙️ HÀM BỘ LỌC ĐỘNG (CHỐNG LỖI SẬP BIỂU ĐỒ TRÒN)
-    # =========================================================
     # =========================================================
     # ⚙️ HÀM BỘ LỌC ĐỘNG (CHỐNG LỖI SẬP BIỂU ĐỒ TRÒN)
     # =========================================================

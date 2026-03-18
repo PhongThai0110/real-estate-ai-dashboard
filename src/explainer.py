@@ -4,7 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
-# TỪ ĐIỂN VIỆT HÓA (Mapping)
+# TỪ ĐIỂN VIỆT HÓA (Mapping cơ bản)
 FEATURE_MAP = {
     "area": "Diện tích đất",
     "front_width": "Mặt tiền ngang",
@@ -13,8 +13,7 @@ FEATURE_MAP = {
     "bathrooms": "Số phòng tắm",
     "floors": "Số tầng",
     "toilet": "Số Toilet",
-    "legal": "Pháp lý",
-    "direction": "Hướng nhà",
+    "road_class": "Phân loại đường",
     "interior": "Nội thất",
     "project_name": "Dự án",
     "is_corner": "Lô góc (2 mặt tiền)",
@@ -27,27 +26,11 @@ FEATURE_MAP = {
     "log_dist": "Khoảng cách đến Trung tâm (Log)",
     "geo_cluster": "Cụm Vị trí / Khu vực",
     "interior_encoded": "Chất lượng nội thất",
-    "direction_Đông": "Hướng: Đông",
-    "direction_Tây": "Hướng: Tây",
-    "direction_Nam": "Hướng: Nam",
-    "direction_Đông Nam": "Hướng: Đông Nam",
-    "direction_Đông Bắc": "Hướng: Đông Bắc",
-    "direction_Tây Nam": "Hướng: Tây Nam",
-    "direction_Tây Bắc": "Hướng: Tây Bắc",
-    "direction_Chưa xác định": "Hướng: Chưa xác định",
-    # "direction_Bắc": "Hướng: Bắc", (Cột này bị drop nên thường sẽ không xuất hiện, nhưng cứ map thừa còn hơn thiếu)
-
-    # --- 5. ONE-HOT ENCODING: PHÁP LÝ (Legal) ---
-    # Quy tắc: legal + "_" + Loại giấy tờ
-    "legal_Sổ hồng/Sổ đỏ": "Pháp lý: Sổ hồng/Sổ đỏ",
-    "legal_Hợp đồng mua bán": "Pháp lý: HĐ Mua bán",
-    "legal_Vi bằng/Giấy tay": "Pháp lý: Vi bằng/Giấy tay",
-
 }
 
 def get_explanation(model, X_input):
     """
-    Tính toán SHAP và GỘP BIẾN Lat/Lon thành 'Vị trí'.
+    Tính toán SHAP và GỘP BIẾN (Location, Direction, Legal) theo chuẩn chuyên gia.
     """
     try:
         # 1. Tính SHAP values
@@ -64,32 +47,59 @@ def get_explanation(model, X_input):
         })
         
         # ==========================================================
-        # [LOGIC MỚI] GỘP LAT & LON THÀNH 'VỊ TRÍ & KHU VỰC'
+        # [LOGIC CHUYÊN GIA] GỘP CÁC BIẾN CÙNG NHÓM (SHAP ADDITIVITY)
         # ==========================================================
         
-        # Lọc lấy giá trị của lat và lon
-        lat_val = df_expl.loc[df_expl['Feature_Raw'] == 'lat', 'Contribution'].sum()
-        lon_val = df_expl.loc[df_expl['Feature_Raw'] == 'lon', 'Contribution'].sum()
-        
-        # Tổng hợp tác động của vị trí
-        location_impact = lat_val + lon_val
-        
-        # Loại bỏ dòng lat và lon cũ
-        df_expl = df_expl[~df_expl['Feature_Raw'].isin(['lat', 'lon'])]
-        
-        # Thêm dòng mới 'Vị trí'
-        new_row = pd.DataFrame([{
-            'Feature_Raw': 'LOCATION_GROUP', 
-            'Contribution': location_impact
-        }])
-        df_expl = pd.concat([df_expl, new_row], ignore_index=True)
-        
+        # --- A. GỘP TỌA ĐỘ THÀNH 'VỊ TRÍ' ---
+        if 'lat' in feature_names and 'lon' in feature_names:
+            loc_impact = df_expl.loc[df_expl['Feature_Raw'].isin(['lat', 'lon']), 'Contribution'].sum()
+            df_expl = df_expl[~df_expl['Feature_Raw'].isin(['lat', 'lon'])]
+            df_expl = pd.concat([df_expl, pd.DataFrame([{'Feature_Raw': 'LOCATION_GROUP', 'Contribution': loc_impact}])], ignore_index=True)
+            
+        # --- B. GỘP ONE-HOT HƯỚNG NHÀ (DIRECTION) ---
+        dir_cols = [col for col in feature_names if col.startswith('direction_')]
+        if dir_cols:
+            # 1. Cộng tổng lực tác động của TẤT CẢ các cột hướng
+            dir_impact = df_expl.loc[df_expl['Feature_Raw'].isin(dir_cols), 'Contribution'].sum()
+            
+            # 2. Tìm xem thực tế User đã nhập hướng nào (Cột nào = 1)
+            selected_dir = "Chưa xác định"
+            for col in dir_cols:
+                if X_input[col].iloc[0] == 1:
+                    selected_dir = col.replace('direction_', '')
+                    break
+                    
+            # 3. Xóa các cột lẻ, tạo 1 dòng gộp duy nhất có tên linh hoạt
+            df_expl = df_expl[~df_expl['Feature_Raw'].isin(dir_cols)]
+            df_expl = pd.concat([df_expl, pd.DataFrame([{'Feature_Raw': f'DIRECTION_GROUP_{selected_dir}', 'Contribution': dir_impact}])], ignore_index=True)
+
+        # --- C. GỘP ONE-HOT PHÁP LÝ (LEGAL) ---
+        legal_cols = [col for col in feature_names if col.startswith('legal_') and col != 'legal_score']
+        if legal_cols:
+            legal_impact = df_expl.loc[df_expl['Feature_Raw'].isin(legal_cols), 'Contribution'].sum()
+            
+            selected_legal = "Chưa xác định"
+            for col in legal_cols:
+                if X_input[col].iloc[0] == 1:
+                    selected_legal = col.replace('legal_', '')
+                    break
+                    
+            df_expl = df_expl[~df_expl['Feature_Raw'].isin(legal_cols)]
+            df_expl = pd.concat([df_expl, pd.DataFrame([{'Feature_Raw': f'LEGAL_GROUP_{selected_legal}', 'Contribution': legal_impact}])], ignore_index=True)
+
         # ==========================================================
-        # [LOGIC MỚI] VIỆT HÓA TÊN GỌI
+        # VIỆT HÓA TÊN GỌI CUỐI CÙNG
         # ==========================================================
         def map_name(raw_name):
-            if raw_name == 'LOCATION_GROUP': return " Vị trí & Khu vực"
-            return FEATURE_MAP.get(raw_name, raw_name) # Nếu không có trong từ điển thì giữ nguyên
+            if raw_name == 'LOCATION_GROUP': 
+                return "Vị trí & Khu vực"
+            if str(raw_name).startswith('DIRECTION_GROUP_'): 
+                val = raw_name.replace('DIRECTION_GROUP_', '')
+                return f"Hướng: {val}"
+            if str(raw_name).startswith('LEGAL_GROUP_'): 
+                val = raw_name.replace('LEGAL_GROUP_', '')
+                return f"Pháp lý: {val}"
+            return FEATURE_MAP.get(raw_name, raw_name)
             
         df_expl['Feature'] = df_expl['Feature_Raw'].apply(map_name)
         
@@ -108,24 +118,15 @@ def plot_waterfall(df_expl):
     """
     Vẽ biểu đồ Waterfall với màu sắc trực quan (Đã chuyển Log thành %).
     """
-    # Lấy Top 7 yếu tố quan trọng nhất (Thêm .copy() để tránh cảnh báo của Pandas)
     top_features = df_expl.head(7).iloc[::-1].copy()
     
-    # =====================================================================
-    # [CẬP NHẬT MỚI: CHUYỂN ĐỔI LOG THÀNH PHẦN TRĂM (%) TÁC ĐỘNG THỰC TẾ]
-    # Công thức: (e^x - 1) * 100
-    # =====================================================================
     top_features['Impact_Percent'] = (np.exp(top_features['Contribution']) - 1) * 100
     
-    # Định dạng màu sắc: Xanh lá (Tăng giá) / Đỏ (Giảm giá)
     colors = ['#00C853' if x > 0 else '#FF5252' for x in top_features['Impact_Percent']]
-    
-    # Định dạng text hiển thị (Thêm dấu + nếu dương, kèm ký hiệu %)
-    # Thay vì hiển thị (Log), ta hiển thị ví dụ: "+9.4%", "-14.7%"
     text_labels = [f"{x:+.1f}%" for x in top_features['Impact_Percent']]
     
     fig = go.Figure(go.Bar(
-        x=top_features['Impact_Percent'], # Đổi trục X sang sử dụng %
+        x=top_features['Impact_Percent'], 
         y=top_features['Feature'],
         orientation='h',
         marker_color=colors,
@@ -135,7 +136,6 @@ def plot_waterfall(df_expl):
     ))
     
     fig.update_layout(
-            # ĐÃ XÓA KHỐI TITLE Ở ĐÂY
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             font=dict(color='white', size=13),
@@ -147,11 +147,8 @@ def plot_waterfall(df_expl):
                 zerolinecolor='white'
             ),
             yaxis=dict(title=""),
-            
-            # --- [CẬP NHẬT: Giảm lề trên (t=20) vì không còn Title của Plotly nữa] ---
             margin=dict(l=10, r=10, t=20, b=65), 
             height=480,
-            
             annotations=[
                 dict(
                     x=0.5,           
@@ -165,4 +162,3 @@ def plot_waterfall(df_expl):
             ]
         )
     return fig
-        

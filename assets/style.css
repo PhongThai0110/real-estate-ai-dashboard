@@ -422,7 +422,7 @@ div[data-testid="stChatMessage"]:has([aria-label*="User"]) div[data-testid="stMa
 div[data-testid="stChatMessage"]:has([data-testid*="user"]) div[data-testid="stMarkdownContainer"] p,
 div[data-testid="stChatMessage"]:has(div[data-testid="stChatAvatar"] svg) div[data-testid="stMarkdownContainer"] p {
     color: #e0f2fe !important; /* Trắng ám xanh lơ */
-    text-align: right !important; /* Căn phải cho thuận mắt */
+    text-align: left !important; /* <-- ĐÃ SỬA LẠI THÀNH LEFT ĐỂ CHỮ KHÔNG BỊ RĂNG CƯA */
 }
 /* ====================================================================== */
 

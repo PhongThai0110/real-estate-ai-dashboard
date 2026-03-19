@@ -16,77 +16,79 @@ def show_chat_interface():
     # 1. HEADER GIAO DIỆN
     # ==============================================================================
     st.markdown("## :material/support_agent: Trợ lý Cố vấn Bất động sản")
-    st.caption(":material/hub: Hỗ trợ giải đáp pháp lý, phân tích dữ liệu thị trường và tư vấn chiến lược (Powered by Multi-Agent AI: Llama-3, Qwen & Gemini)")
+    st.caption(":material/hub: Hỗ trợ giải đáp pháp lý, phân tích dữ liệu thị trường và tư vấn chiến lược")
     
-    # Nút xóa lịch sử (Đã được CSS "làm mềm" lại thành dạng Outline viền xám)
+    # Nút xóa lịch sử
     if st.button(":material/delete_outline: Xóa lịch sử chat", type="secondary"):
-        st.session_state.messages = []
-        st.rerun() 
+        st.session_state.messages = [{
+            "role": "assistant", 
+            "content": "Chào bạn! Tôi là Trợ lý Cố vấn Bất động sản. Tôi có thể giúp gì cho bạn về thủ tục pháp lý, quy hoạch hay phân tích thị trường hôm nay?"
+        }]
+        st.rerun()
 
     # ==============================================================================
     # 2. KHỞI TẠO BỘ NHỚ
     # ==============================================================================
     if "messages" not in st.session_state:
-        st.session_state.messages = []
-        st.session_state.messages.append({
+        st.session_state.messages = [{
             "role": "assistant", 
             "content": "Chào bạn! Tôi là Trợ lý Cố vấn Bất động sản. Tôi có thể giúp gì cho bạn về thủ tục pháp lý, quy hoạch hay phân tích thị trường hôm nay?"
-        })
-        
-    if "suggested_prompt" not in st.session_state:
-        st.session_state.suggested_prompt = None
+        }]
 
     # ==============================================================================
-    # 3. HIỂN THỊ NÚT GỢI Ý
+    # 3. HIỂN THỊ TOÀN BỘ LỊCH SỬ CHAT (BƯỚC NÀY PHẢI ĐƯỢC ĐẨY LÊN TRÊN)
     # ==============================================================================
-    if len(st.session_state.messages) == 1:
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # 📢 SỬA LỖI 1: KHẮC PHỤC LỖI MARKDOWN BẰNG HTML THUẦN
-        # Dùng thẻ <p> thay vì ** để chữ in đậm, đẹp và không bao giờ lộ code
-        st.markdown("<p style='font-weight: 500; font-size: 14.5px; color: #999999; margin-bottom: 15px;'> Gợi ý câu hỏi để thử nghiệm hệ thống:</p>", unsafe_allow_html=True)
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("Tìm nhà Cầu Giấy 15 Tỷ",type="tertiary", use_container_width=True):
-                st.session_state.suggested_prompt = "Tôi có 15 tỷ. Tôi đang phân vân giữa việc mua nhà lô góc ở Cầu Giấy và một lô đất nền ở Hoài Đức. Hãy tìm cho tôi 1 căn nhà phố Cầu Giấy đắt nhất (trong tầm giá 15 tỷ) và 1 lô đất nền Hoài Đức diện tích to nhất (cũng trong tầm giá 15 tỷ). In rõ thông tin từng căn ra."
-        with col2:
-            if st.button("Hỏi Luật Đầu cơ & Khống chế giá",type="tertiary", use_container_width=True):
-                st.session_state.suggested_prompt = "Tôi thấy dạo này giá nhà chung cư đang tăng ảo. Theo các văn bản pháp lý hiện hành từ năm 2024 trở đi, có quy định nào khống chế giá trần chung cư hay chống đầu cơ thổi giá không?"
-        with col3:
-            if st.button("Tính Thuế Phí", type="tertiary", use_container_width=True):
-                st.session_state.suggested_prompt = "Tìm cho tôi căn biệt thự VIP có giá rẻ nhất ở Quận 3. Dựa trên mức giá của căn đó, hãy tính tổng chi tiết các loại thuế, phí trước bạ và phí công chứng mà tôi nộp theo luật 2026. Tổng chi phí cuối cùng là bao nhiêu?"
-        st.markdown("---")
-
-    # ==============================================================================
-    # 4. HIỂN THỊ LỊCH SỬ CHAT
-    # ==============================================================================
+    # Render các tin nhắn ra trước để chúng cố định vị trí, không bị nhảy lung tung
     for message in st.session_state.messages:
         avatar_img = BOT_AVATAR if message["role"] == "assistant" else USER_AVATAR
         with st.chat_message(message["role"], avatar=avatar_img): 
             st.markdown(message["content"])
 
     # ==============================================================================
-    # 5. XỬ LÝ NHẬP LIỆU
+    # 4. HIỂN THỊ NÚT GỢI Ý (NẰM DƯỚI CÂU CHÀO)
     # ==============================================================================
-    prompt = st.chat_input("Nhập câu hỏi của bạn (VD: Thủ tục sang tên sổ đỏ?)...") or st.session_state.suggested_prompt
-
-    if prompt:
-        st.session_state.suggested_prompt = None
+    # Chỉ hiển thị khi có duy nhất 1 tin nhắn (là câu chào)
+    if len(st.session_state.messages) == 1:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<p style='font-weight: 500; font-size: 14.5px; color: #999999; margin-bottom: 15px;'> Gợi ý câu hỏi để thử nghiệm hệ thống:</p>", unsafe_allow_html=True)
         
-        with st.chat_message("user", avatar=USER_AVATAR): 
-            st.markdown(prompt)
-        
-        st.session_state.messages.append({"role": "user", "content": prompt})
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("Tìm nhà Cầu Giấy 15 Tỷ", type="tertiary", use_container_width=True):
+                st.session_state.messages.append({"role": "user", "content": "Tôi có 15 tỷ. Tôi đang phân vân giữa việc mua nhà lô góc ở Cầu Giấy và một lô đất nền ở Hoài Đức. Hãy tìm cho tôi 1 căn nhà phố Cầu Giấy đắt nhất (trong tầm giá 15 tỷ) và 1 lô đất nền Hoài Đức diện tích to nhất (cũng trong tầm giá 15 tỷ). In rõ thông tin từng căn ra."})
+                st.rerun()
+        with col2:
+            if st.button("Hỏi Luật Đầu cơ & Khống chế giá", type="tertiary", use_container_width=True):
+                st.session_state.messages.append({"role": "user", "content": "Tôi thấy dạo này giá nhà chung cư đang tăng ảo. Theo các văn bản pháp lý hiện hành từ năm 2024 trở đi, có quy định nào khống chế giá trần chung cư hay chống đầu cơ thổi giá không?"})
+                st.rerun()
+        with col3:
+            if st.button("Tính Thuế Phí", type="tertiary", use_container_width=True):
+                st.session_state.messages.append({"role": "user", "content": "Tìm cho tôi căn biệt thự VIP có giá rẻ nhất ở Quận 3. Dựa trên mức giá của căn đó, hãy tính tổng chi tiết các loại thuế, phí trước bạ và phí công chứng mà tôi nộp theo luật 2026. Tổng chi phí cuối cùng là bao nhiêu?"})
+                st.rerun()
 
+    # ==============================================================================
+    # 5. XỬ LÝ GEN AI & STREAMING TEXT
+    # ==============================================================================
+    # Kích hoạt khi tin nhắn cuối cùng là của Khách hàng
+    if st.session_state.messages[-1]["role"] == "user":
         with st.chat_message("assistant", avatar=BOT_AVATAR): 
-            with st.spinner("AI đang tra cứu dữ liệu và pháp lý..."):
-                ai_reply = chatbot_engine.chat_router(
-                    prompt, 
-                    st.session_state.messages[:-1] 
-                )
+            status_placeholder = st.empty()
+            status_placeholder.markdown("⏳ *AI đang phân tích dữ liệu và pháp lý, vui lòng đợi...*")
             
+            # Gọi Engine
+            user_prompt = st.session_state.messages[-1]["content"]
+            history = st.session_state.messages[:-1]
+            ai_reply = chatbot_engine.chat_router(user_prompt, history)
+            
+            # Hoàn thành -> Stream chữ
+            status_placeholder.empty()
             st.write_stream(stream_generator(ai_reply))
         
         st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+
+    # ==============================================================================
+    # 6. Ô NHẬP LIỆU CỦA NGƯỜI DÙNG
+    # ==============================================================================
+    if prompt := st.chat_input("Nhập câu hỏi của bạn (VD: Thủ tục sang tên sổ đỏ?)..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.rerun()

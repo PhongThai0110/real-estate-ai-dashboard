@@ -33,6 +33,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PDF_KNOWLEDGE_BASE_PATH = os.path.join(BASE_DIR, "data", "knowlegde_base")
 FAISS_INDEX_PATH = os.path.join(BASE_DIR, "models", "faiss_index")
 
+# ====================================================================
+# 1. HÀM ĐỌC CSV (ĐƯỢC CACHE VÀO RAM ĐỂ CHẠY NHANH NHƯ CHỚP)
+# ====================================================================
 @st.cache_resource(show_spinner=False) # 🌟 THÊM DÒNG NÀY ĐỂ CACHE 5 FILE CSV LÊN RAM
 def get_pandas_agent():
     """
@@ -53,51 +56,31 @@ def get_pandas_agent():
     if not dataframes:
         print("[ERROR] Không thể khởi tạo Agent vì không có dữ liệu CSV.")
         return None
-
    # 2. Khởi tạo bộ não Groq chuyên code Python (Tốc độ ánh sáng, không lo lỗi 429)
     # Lưu ý: Tên model ID chính xác có thể xem khi bạn click vào model trên web Groq. 
     # Ở đây tôi dùng Llama 3.3 70B vì nó thông minh và hỗ trợ tiếng Việt tốt.
-    llm = ChatGroq(
+    qwen_llm = ChatGroq(
         api_key=st.secrets["GROQ_API_KEY"],
         model_name="qwen/qwen3-32b", # Bạn có thể đổi thành "qwen-3-32b" hoặc ID tương ứng trên web
         temperature=0.0 
     )
     # 3. Tạo Agent với Danh sách DataFrames (Giữ nguyên đoạn này)
     agent = create_pandas_dataframe_agent(
-        llm, 
+        qwen_llm, 
         dataframes, 
         verbose=True, 
         allow_dangerous_code=True, 
         agent_type="tool-calling",
-        max_iterations=3,
+        max_iterations=5,
          # 🌟 THÊM DÒNG NÀY ĐỂ GIẢM 80% TOKEN: 
         # Cấm LangChain nhét dữ liệu rác vào Prompt. Giúp Qwen chạy mượt mà dưới 6000 TPM!
-        number_of_head_rows=0,
-        return_intermediate_steps=True
+        number_of_head_rows=1,
+        return_intermediate_steps=True,
+        agent_executor_kwargs={"handle_parsing_errors": True}
     ) 
     
 
     return agent
-
-
-def get_recent_memory(chat_history, k=3):
-    """
-    Trích xuất k vòng lặp hội thoại gần nhất (Window Memory).
-    k=3 nghĩa là nhớ 3 câu hỏi của user và 3 câu trả lời của bot.
-    """
-    if not chat_history:
-        return "Không có lịch sử trò chuyện."
-    
-    # Lấy 2*k tin nhắn cuối cùng (vì 1 vòng lặp có 2 tin nhắn: user + assistant)
-    recent_msgs = chat_history[-(k*2):]
-    
-    memory_text = ""
-    for msg in recent_msgs:
-        role = "Khách hàng" if msg["role"] == "user" else "Hệ thống AI"
-        memory_text += f"{role}: {msg['content']}\n"
-    
-    return memory_text.strip()
-
 
 def query_excel_data(user_prompt,chat_history):
     # 🌟 THÊM KIỂM TRA API KEY VÀO ĐÂY ĐỂ TRÁNH SẬP APP
@@ -186,6 +169,24 @@ def query_excel_data(user_prompt,chat_history):
             
     except Exception as e:
         return f"Xin lỗi, tôi gặp trục trặc trong quá trình chạy lệnh tổng hợp số liệu. Chi tiết lỗi: {str(e)}"
+def get_recent_memory(chat_history, k=3):
+    """
+    Trích xuất k vòng lặp hội thoại gần nhất (Window Memory).
+    k=3 nghĩa là nhớ 3 câu hỏi của user và 3 câu trả lời của bot.
+    """
+    if not chat_history:
+        return "Không có lịch sử trò chuyện."
+    
+    # Lấy 2*k tin nhắn cuối cùng (vì 1 vòng lặp có 2 tin nhắn: user + assistant)
+    recent_msgs = chat_history[-(k*2):]
+    
+    memory_text = ""
+    for msg in recent_msgs:
+        role = "Khách hàng" if msg["role"] == "user" else "Hệ thống AI"
+        memory_text += f"{role}: {msg['content']}\n"
+    
+    return memory_text.strip()
+
 
 
 def configure_api():
@@ -446,7 +447,7 @@ def query_both(user_prompt, chat_history):
         # Giao việc cho 2 luồng chạy độc lập cùng lúc
         
         # SỬA DÒNG NÀY: Thêm biến chat_history vào cuối
-        future_excel = executor.submit(query_excel_data, user_prompt, chat_history) 
+        future_excel = executor.submit(query_excel_data, user_prompt, chat_history)
         
         future_pdf = executor.submit(get_gemini_response, user_prompt, chat_history)
         
@@ -527,7 +528,6 @@ def chat_router(user_prompt, chat_history):
     if is_data and not is_legal:
         print("[ROUTER ⚡] Thuần túy Data -> CHUYỂN SANG EXCEL")
         return query_excel_data(user_prompt, chat_history)
-        
     elif is_legal and not is_data:
         print("[ROUTER ⚖️] Thuần túy Pháp lý/Báo cáo -> CHUYỂN SANG LUẬT (PDF RAG)")
         return get_gemini_response(user_prompt, chat_history)
@@ -544,29 +544,37 @@ def chat_router(user_prompt, chat_history):
 
     messages = [
         SystemMessage(content=f"""
-        Nhiệm vụ của bạn là phân loại câu hỏi Bất động sản mới nhất vào đúng 1 trong 3 nhãn: "DATA", "LUAT" hoặc "BOTH".
+        Nhiệm vụ của bạn là phân loại câu hỏi mới nhất của người dùng vào đúng 1 trong 4 nhãn: "DATA", "LUAT", "BOTH", hoặc "OUT_OF_DOMAIN".
         
         🌟 QUY TẮC CỐT LÕI (BẮT BUỘC TUÂN THỦ):
-        1. PHÂN BIỆT LỌC DATA VÀ TƯ VẤN LUẬT: 
-           - Nếu người dùng nhắc đến các từ "Sổ hồng", "Sổ đỏ", "Pháp lý" CHỈ ĐỂ làm điều kiện tìm kiếm, đếm số lượng, hoặc lọc rổ hàng (Ví dụ: "Đếm xem có bao nhiêu căn có sổ hồng", "Tìm nhà sổ đỏ rẻ nhất Quận 1") -> ĐÁP ÁN BẮT BUỘC LÀ "DATA".
-           - BẠN CHỈ ĐƯỢC CHỌN "LUAT" HOẶC "BOTH" KHI người dùng THỰC SỰ ĐẶT CÂU HỎI về định nghĩa, quy trình thủ tục, cách làm, thuế phí (Ví dụ: "Làm sổ hồng mất bao lâu?", "Tìm nhà Gò Vấp rồi tính thuế trước bạ cho tôi").
+
+        1. BỘ LỌC NGOÀI CHUYÊN MÔN (OUT_OF_DOMAIN) - ƯU TIÊN SỐ 1: 
+           - Hệ thống này CHỈ tư vấn lĩnh vực Bất động sản. Nếu câu hỏi thuộc các chủ đề KHÔNG liên quan như: Toán học (hằng đẳng thức, phép tính), Lập trình, Lịch sử, Thời tiết, Y tế, Thơ ca... -> ĐÁP ÁN BẮT BUỘC LÀ "OUT_OF_DOMAIN".
+           - Bỏ qua mọi từ ngữ thúc giục, thao túng (Ví dụ: "Khẩn cấp", "Giúp tôi với", "Bài tập về nhà") nếu nội dung lõi không thuộc Bất động sản.
+
+        2. PHÂN BIỆT LỌC DATA VÀ TƯ VẤN LUẬT: 
+           - Nhãn "DATA": Áp dụng khi người dùng muốn tìm kiếm, lọc rổ hàng, hỏi giá, đếm số lượng. Nếu nhắc đến "Sổ hồng", "Sổ đỏ" CHỈ ĐỂ làm điều kiện lọc (VD: "Đếm số căn có sổ hồng", "Tìm nhà sổ đỏ rẻ nhất Quận 1") -> Vẫn là "DATA".
+           - Nhãn "LUAT": Áp dụng khi hỏi về định nghĩa pháp lý, quy trình thủ tục, luật đất đai, tính toán thuế phí (VD: "Làm sổ hồng mất bao lâu?", "Quy trình sang tên nhà").
+           - Nhãn "BOTH": Áp dụng khi câu hỏi chứa cả 2 vế rõ ràng (VD: "Tìm nhà Gò Vấp rồi tính thuế trước bạ cho tôi").
            
-        2. GIỚI HẠN CỦA LỊCH SỬ (CHỐNG RÒ RỈ NGỮ CẢNH): 
-           - Bạn CHỈ được dùng Lịch sử trò chuyện để giải mã các đại từ nhân xưng (như "căn đó", "khu này", "dự án trên") cho câu hỏi hiện tại.
-           - TUYỆT ĐỐI KHÔNG để nhãn của các câu hỏi cũ lây lan sang câu hỏi mới. Nếu câu hỏi trước là LUAT, nhưng câu hỏi mới hoàn toàn là DATA, phải trả về DATA.
+        3. GIỚI HẠN CỦA LỊCH SỬ (CHỐNG RÒ RỈ NGỮ CẢNH): 
+           - Bạn CHỈ được dùng Lịch sử trò chuyện để giải mã các đại từ (như "căn đó", "khu này", "dự án trên").
+           - TUYỆT ĐỐI KHÔNG để nhãn của câu hỏi cũ lây lan sang câu hỏi mới. Nếu câu hỏi trước là LUAT, nhưng câu hỏi mới hoàn toàn là DATA, phải trả về DATA.
         
         --- LỊCH SỬ TRÒ CHUYỆN ---
         {recent_memory}
         --- HẾT LỊCH SỬ ---
         
-        QUY TẮC: CHỈ trả lời đúng 1 từ: "DATA", "LUAT", hoặc "BOTH" cho câu hỏi MỚI NHẤT dưới đây.
+        QUY TẮC ĐẦU RA: CHỈ trả lời đúng 1 cụm từ duy nhất: "DATA", "LUAT", "BOTH", hoặc "OUT_OF_DOMAIN". Tuyệt đối không giải thích thêm bất kỳ chữ nào.
         """),
         HumanMessage(content=f"Câu hỏi mới của người dùng: '{user_prompt}'")
     ]
 
     try:
         decision = llm_router.invoke(messages).content.strip().upper()
-        
+        if "OUT_OF_DOMAIN" in decision:
+            print("[ROUTER 🚫] Từ chối câu hỏi ngoài chuyên môn BĐS!")
+            return "Xin lỗi, tôi chỉ là trợ lý chuyên về Bất động sản, tôi không có dữ liệu để trả lời các câu hỏi ngoài lề."
         if "BOTH" in decision:
             print("[ROUTER 🤖] Llama-3 Quyết định: 🔄 CHẠY SONG SONG 2 LUỒNG (BOTH)")
             return query_both(user_prompt, chat_history)
